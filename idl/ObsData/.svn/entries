@@ -1,0 +1,119 @@
+8
+
+dir
+157
+svn+ssh://garel@octopus.univ-lyon1.fr/home/blaizot/svn/GalaxyMaker/idl/ObsData
+svn+ssh://garel@octopus.univ-lyon1.fr/home/blaizot/svn
+
+
+
+2009-05-27T10:07:56.070677Z
+140
+garel
+
+
+svn:special svn:externals svn:needs-lock
+
+
+
+
+
+
+
+
+
+
+
+87508296-80dc-11dd-839a-b11695017e98
+
+reddy08
+dir
+
+DR3_MF_data_BdP.sav
+file
+
+
+
+
+2010-01-26T14:22:49.000000Z
+7bcff871901aa87097cc8506bb98e1fc
+2008-09-12T15:12:49.884170Z
+1
+blaizot
+has-props
+
+Babbedge06
+dir
+
+Baldry04
+dir
+
+add_obs_data.pro
+file
+
+
+
+
+2010-01-26T14:22:49.000000Z
+db4e33d087e964ae8c53bd2efe1dfccc
+2008-09-12T15:12:49.884170Z
+1
+blaizot
+
+Zwaan05
+dir
+
+bouwens07
+dir
+
+Caputi06
+dir
+
+gabasch04
+dir
+
+bimodality.pro
+file
+
+
+
+
+2010-01-26T14:22:49.000000Z
+ab31b87040ddb00b9efcdaecbd5d103f
+2008-09-12T15:12:49.884170Z
+1
+blaizot
+
+mclure08
+dir
+
+Shen03
+dir
+
+Blanton05
+dir
+
+Tremonti04
+dir
+
+Yang08
+dir
+
+drory07
+dir
+
+plot_obs_data.pro
+file
+
+
+
+
+2010-01-26T14:22:49.000000Z
+a08b7b31104d736aecd2957a7a6288b2
+2009-03-18T10:34:58.204163Z
+128
+blaizot
+
+iwata07
+dir
+

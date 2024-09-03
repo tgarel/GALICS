@@ -1,0 +1,6 @@
+Gabasch et al. 2004  about UV rest-frame  LF
+
+survey: FORS Deep Field (FOF): 7'* 7', 0.5 < z < 5.0
+I-band selected catalogue (limit: I(AB)=26.8) : 5558 objects (photometry redshift)
+
+UV LF in 5 bands: 2800A, 1500A, g'(SDSS), u'(SDSS) and B.

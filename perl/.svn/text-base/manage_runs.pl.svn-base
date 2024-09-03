@@ -1,0 +1,221 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+# Tree files parameters
+# --- WMAP1 256 option ---
+# my $treeDir      = "/simulations/Horizon/256-100h-1Mpc/TreeMaker/FOF/";
+# my $treeFileMin  = 1;
+# my $treeFileMax  = 24;
+# my $treeFileBase = "tree_file_073";
+# my $nsteps       = 73; # 80;  # number of timesteps 
+# --- WMAP1 512 option --- 
+my $treeDir      = "/data/blaizot/Horizon/512-100h-1Mpc/TreeMakerAcc/";
+my $treeFileMin  = 1;
+my $treeFileMax  = 15;
+my $treeFileBase = "tree_file_080";
+my $nsteps       = 80;  # number of timesteps 
+# --- WMAP3 512 option --- 
+#my $treeDir      = "/data/blaizot/Horizon/512-100h-1Mpc-W3/TreeMakerAcc/FOF/bigTrees/";
+#my $treeFileMin  = 1;
+#my $treeFileMax  = 15;
+#my $treeFileBase = "tree_file_090";
+#my $nsteps       = 90;  # number of timesteps 
+
+# GalaxyMaker run path 
+my $gmDir        = "/data/blaizot/GM-RUNS/512-100h-1Mpc/StdParams/";
+my $logFile      = "log.out"; # where stderr is re-directed...
+
+# comment/uncomment the following lines as you need:
+clear_dirs();
+prepare_runs();
+launch_runs(1,15);
+check_runs();
+
+
+
+# CLEAR DIRS
+# ----------
+# clear directories if they already exist.
+sub clear_dirs {
+    my $cmd = "rm -rf $gmDir ";
+    system($cmd);
+    $cmd = "mkdir $gmDir";
+    system($cmd);
+}
+
+
+# PREPARE RUNS 
+# ------------
+# create directories to run GalaxyMaker and write in each of them the
+# parameter files that are needed (as defined in settings.pl). Also make a
+# copy of the executable GalaxyMaker in each dir.
+sub prepare_runs {
+    for (my $irun = $treeFileMin; $irun <= $treeFileMax; $irun++) 
+    {
+	my $runDir = "$gmDir"."/$irun";
+	my $cmd = "mkdir $runDir $runDir"."/Snapshots $runDir"."/spectra";
+	system($cmd);
+	$cmd = "cp ../main/GalaxyMaker $runDir"."/GM$irun"; #give specific name to see in top
+	system($cmd);
+	$cmd = "cp -r ../main $runDir"."/."; # also copy code and makefile to check
+	system($cmd);
+	my $num = "$irun";
+	if ($irun < 100) {$num = "0"."$num";}
+	if ($irun < 10) {$num = "0"."$num";}
+	$cmd = "ln -s $treeDir"."/$treeFileBase".".$num"." $runDir"."/tree_file";
+	system($cmd);
+	
+	write_baryons_dat($runDir,$nsteps);
+	write_filters_dat($runDir);
+	write_ascii_ts_list_dat($runDir,$nsteps);
+    }
+}
+
+# LAUNCH RUNS 
+# -----------
+# start runs from i1 to i2 
+sub launch_runs {
+    my $i1 = $_[0];
+    my $i2 = $_[1];
+    for (my $irun = $i1; $irun <= $i2; $irun++) 
+    {
+	my $cmd = "cd $gmDir"."/$irun  ; ./GM$irun ./ > $gmDir"."/$irun"."/$logFile & ";
+	system($cmd);
+    }
+}
+
+# CHECK JOBS
+# ----------
+sub check_runs {
+    my $nsuccess = 0;
+    my $nfailed  = 0;
+    my $nmissing = 0;
+    my $file = "$gmDir"."/successRun.list";
+    open(SFILE,">$file");
+    $file = "$gmDir"."/failedRun.list";
+    open(FFILE,">$file");
+    $file = "$gmDir"."/missingsRun.list";
+    open(MFILE,">$file");
+    for (my $irun = 1; $irun <= $treeFileMax; $irun++) 
+    {
+	$file = "$gmDir"."/$irun"."/$logFile";
+	if (-e $file) # log file exists
+	{
+	    my $cmd = "grep \"END OF GalaxyMaker\" $file";
+	    if (!system($cmd)) {
+		$nsuccess++;
+		print SFILE "$irun \n";
+	    }else{
+		$nfailed++;
+		print FFILE "$irun \n";
+	    }
+	} 
+	else  # log file does not exist 
+	{
+	    $nmissing++;
+	    print MFILE "$irun \n";
+	}
+    }
+    close(SFILE);
+    close(FFILE);
+    close(MFILE);
+    print "nb of jobs completed              : $nsuccess \n";
+    print "nb of jobs failed (or incomplete) : $nfailed \n";
+    print "nb of jobs missing                : $nmissing \n";
+}
+
+
+#------------------- SUBS ---------------------# 
+
+# GalaxyMaker parameters (baryons.dat file)
+sub write_baryons_dat {
+    my $filename = "$_[0]"."/baryons.dat";
+    my $nsteps   = $_[1];
+    open(FILE,">$filename");
+# --- WMAP1 simulations ----
+    print FILE "omega_0        = 0.300         ! amount of dark matter \n";
+    print FILE "omega_b        = 0.044         ! amount of baryons  \n";
+    print FILE "hub            = 0.700         ! reduced hubble parameter  \n";
+    print FILE "Lbox           = 142.85714     ! size of the box in physical Mpc \n";
+# --- WMAP3 simulations ----
+#      print FILE "omega_0        = 0.240         ! amount of dark matter \n";
+#      print FILE "omega_b        = 0.044         ! amount of baryons  \n";
+#      print FILE "hub            = 0.730         ! reduced hubble parameter  \n";
+#      print FILE "Lbox           = 136.9863      ! size of the box in physical Mpc \n";
+    
+    print FILE "alphapar       = 1.00          ! star formation efficiency \n";
+    print FILE "epsilon        = 0.2           ! feedback efficiency  \n";
+    print FILE "psi            = 0.017         ! SS merging normalization \n";
+    print FILE "chi            = 3.333         ! power-law for merging galaxies mass distribution \n";
+    print FILE "IMF            = kenn          ! initial mass function : kennicutt, salpeter or scalo \n";
+    print FILE "z_reionisation = 10.0          ! redshift at which reionisation is completed \n";
+    print FILE "alpha_reheat   = 0.001         ! efficiency of SN heating on the IGM \n";
+    print FILE "meta_stable    = 1.2           ! disc stability parameter \n";
+    print FILE "disc_instability_threshhold  = 0.4  ! stability limit for discs \n";
+    print FILE "logMmin = -0.5  \n";
+    print FILE "logMmax = 1.5   \n";
+    print FILE "ColdAccretionZ = 0.001         ! metallicity of cold flows \n";
+    print FILE "frac_acc_in_burst = 0.4        ! fraction of gas accreted directly onto the burst component \n";
+    print FILE "delay_fountain    = 0.5           ! starts fountain delay_fountain times the halo t_dyn later \n ";
+    print FILE "duration_fountain = 2.5           ! extends the fountain delay_fountain times the halo t_dyn \n ";
+
+    print FILE "treefile       = ./tree_file \n";
+    print FILE "inputpath      = /data/blaizot/GM_Inputs/ \n";
+    print FILE "filterpath     = /data/blaizot/Filters/ \n";
+    print FILE "spec_dir       = ./spectra/ \n";
+    print FILE "momaf_snap_dir = ./Snapshots/ \n";
+    print FILE "nsteps_do      = 45   ! number of timesteps to compute \n";
+   close(FILE);
+}
+
+# GalaxyMaker filter list (filters.dat file)
+sub write_filters_dat {
+    my $filename = "$_[0]"."/filters.dat";
+    open(FILE,">$filename");
+    print FILE "24 \n";
+    print FILE "STEIDEL_Un \n";
+    print FILE "STEIDEL_G \n";
+    print FILE "STEIDEL_R \n";
+    print FILE "NUV_galex \n";
+    print FILE "FUV_galex \n"; 
+    print FILE "SDSS_U \n";
+    print FILE "SDSS_g \n";
+    print FILE "SDSS_r \n";
+    print FILE "SDSS_i \n";
+    print FILE "SDSS_z \n";
+    print FILE "IRAS_12mic \n";
+    print FILE "IRAS_25mic \n";
+    print FILE "IRAS_60mic \n";
+    print FILE "IRAS_100mic \n";
+    print FILE "SCUBA_850mic \n";
+    print FILE "MIPS_160mic \n";
+    print FILE "MIPS_24mic \n";
+    print FILE "MIPS_70mic \n";
+    print FILE "UV_1500A_Gab04 \n";
+    print FILE "UV_2800A_Gab04 \n";
+    print FILE "JOHNSON_BAB \n";
+    print FILE "i775 \n";
+    print FILE "z850 \n";
+    print FILE "iwata07_1570A \n";
+    close(FILE);
+}
+
+# GalaxyMaker list of rest-frame mag outputs
+sub write_ascii_ts_list_dat {
+    my $filename = "$_[0]"."/ascii_ts_list.dat";
+    my $nsteps   = $_[1];    
+    open(FILE,">$filename");
+    print FILE "! This file contains the list of timesteps for which rf mags will be outputed.\n";
+#     print FILE "4 ! bla bla \n";
+#     print FILE "8 \n";
+#     print FILE "11 \n";
+#     print FILE "13 \n";
+#     print FILE "16 \n";
+    print FILE "$nsteps  ! nb of timesteps to output ... \n"; # compute mags at last output (z=0)
+    for (my $i = 1; $i <= $nsteps; $i++) {
+	print FILE "$i \n";
+    }
+    close(FILE);
+}
+

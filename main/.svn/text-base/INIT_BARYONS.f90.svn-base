@@ -1,0 +1,884 @@
+module INIT_BARYONS
+
+  use GLOB_DEFS
+  use UTILS_BARYONS
+  
+  public
+
+contains
+
+!/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+!*****************************************************************************************************************  
+  subroutine init_timestep
+
+  ! initializes the global variable that contains timestep informations 
+
+    implicit none
+ 
+    ! Each timestep records a number of parameters: some are averages, some totals (see GLOB_DEFS.F) 
+    tsno(:)%global_SF    = 0.0d0 ; tsno(:)%aexp         = 0.0d0
+    tsno(:)%omega_t      = 0.0d0 ; tsno(:)%age_univ     = 0.0d0 ; tsno(:)%nb_of_halos   = 0 
+    tsno(:)%age_univm10  = 0.0d0 ; tsno(:)%age_univm100 = 0.0d0 
+    tsno(:)%mass_bary    = 0.0d0 ; tsno(:)%mass_cold    = 0.0d0 ; tsno(:)%mass_halo     = 0.0d0
+    tsno(:)%mass_star    = 0.0d0 ; tsno(:)%mass_metals  = 0.0d0 ; tsno(:)%n_form        = 0   
+    tsno(:)%n_ss         = 0     ; tsno(:)%n_dynfric    = 0     ; tsno(:)%n_total       = 0
+    tsno(:)%average_tau  = 0.0d0 ; tsno(:)%n_biglost    = 0     ; tsno(:)%n_unst        = 0
+    tsno(:)%n_lost       = 0     ; tsno(:)%tau_count    = 0   
+    tsno(:)%t_igm        = 0.0d0
+    tsno(:)%nb_maj_mergs = 0     ; tsno(:)%nb_min_mergs = 0     ; tsno(:)%nb_halo_mergs = 0
+    tsno(:)%mass_gal_gas = 0.0d0 ; tsno(:)%mass_hot_gas = 0.0d0 ; tsno(:)%mass_hot_mets = 0.0d0
+#ifdef DUAL_IMF 
+    tsno(:)%global_SF2   = 0.0d0
+    tsno(:)%mass_star2   = 0.0d0
+#endif
+
+    return
+
+  end subroutine init_timestep
+
+!******************************************************************************************************************
+
+  function cold_fraction(mh)
+
+    ! return the fraction of gas that goes into halo of mass mh cold (adaptation from Ocvirk et al 08).
+
+    implicit none
+
+    real(kind=8) :: cold_fraction,mh,lmh
+    real(kind=8) :: mcrit, mstream, lmin, lmax
+    
+    
+!!$    mcrit = 10.d0**0.8
+!!$    if (global_redshift < 3.0d0) then 
+!!$       
+!!$       if (mh < mcrit) then 
+!!$          cold_fraction = 1.0d0 
+!!$       else 
+!!$          cold_fraction = 0.0d0
+!!$       end if
+!!$       
+!!$    else
+!!$       
+!!$       mstream = log10(mcrit) + (global_redshift - 3.0d0) / 1.8 * 2.2
+!!$       if (log10(mh) < mstream) then 
+!!$          cold_fraction = 1.0d0 
+!!$       else 
+!!$          cold_fraction = 0.0d0
+!!$       end if
+!!$
+!!$    end if
+
+    ! simple fit-by-eye of Ocvirk's Fig. 4 : linear decrease with log10(halo mass) between logMmin and 
+    ! logMmax, from a fraction of 1 to a fraction of 0.
+    
+    ! scale min max with z : 
+    if (global_redshift > 3.0) then 
+       lmin = logMmin + global_redshift - 3.
+       lmax = logMmax + global_redshift - 3.
+    else
+       lmin = logMmin
+       lmax = logMmax
+    end if
+
+    lmh = log10(mh)
+    if (lmh < lmin) then 
+       cold_fraction = 1.d0
+    elseif (lmh > lmax) then 
+       cold_fraction = 0.d0
+    else
+       cold_fraction = (lmax - lmh) / (lmax - lmin)
+    end if
+
+    return
+
+  end function cold_fraction
+
+!******************************************************************************************************************
+  subroutine compute_adiab_fact(h,adiab_fact)
+
+    implicit none
+
+    type(halo)      :: h
+    real(kind=8)    :: adiab_fact,rho_t
+    
+    ! average density of the universe at time t  in 10^11 M_sun/Mpc^3
+    rho_t      = 2.7752d0*hubble**2*omega_0*(tsno(nsteps)%aexp/tsno(h%my_timestep)%aexp)**3
+    if (profile == 'TSIS') then
+       adiab_fact = (3.0d0 * h%halo_profile%rho_0 / rho_t)**0.666667d0
+    else
+       write(errunit,*) '> Profile not implemented in compute_adiab_fact'
+       stop
+    endif
+
+    adiab_fact = max(1.0d0,adiab_fact)
+
+    return
+
+  end subroutine compute_adiab_fact
+
+!******************************************************************************************************************
+  subroutine copy_halo_props(h1,h2)
+
+  ! copy halo h2 into h1 (all the levels of the structure, including galaxies)
+  ! NB : have to do this because simple 'h1 = h2' copies addresses of pointers instead of allocating them
+
+    implicit none
+    
+    type(halo)      :: h1,h2
+    integer(kind=4) :: i
+
+    call clear_halo(h1)
+
+    !id and formation expansion factor :
+    h1%my_number          = h2%my_number
+    h1%my_timestep        = h2%my_timestep 
+    h1%my_form_aexp       = h2%my_form_aexp
+            
+    !family links :
+    h1%tree%frag          = h2%tree%frag 
+    if (h2%tree%ndads > 0) then
+       allocate(h1%tree%dads(h2%tree%ndads))
+       h1%tree%ndads = h2%tree%ndads
+       h1%tree%dads  = h2%tree%dads
+    end if
+    if (h2%tree%nsons > 0) then
+       allocate(h1%tree%sons(h2%tree%nsons))
+       h1%tree%nsons = h2%tree%nsons
+       h1%tree%sons  = h2%tree%sons
+    end if
+    if (h2%my_fathers%nb_fathers > 0) then
+       h1%my_fathers%nb_fathers   = h2%my_fathers%nb_fathers 
+       allocate(h1%my_fathers%list_fathers(h2%my_fathers%nb_fathers))
+       h1%my_fathers%list_fathers = h2%my_fathers%list_fathers
+       allocate(h1%my_fathers%mass_fathers(h2%my_fathers%nb_fathers))
+       h1%my_fathers%mass_fathers = h2%my_fathers%mass_fathers
+    end if
+    if (h2%my_sons%nb_sons > 0) then
+       h1%my_sons%nb_sons  = h2%my_sons%nb_sons
+       allocate(h1%my_sons%list_sons(h2%my_sons%nb_sons))
+       h1%my_sons%list_sons = h2%my_sons%list_sons
+    end if
+
+    !baryon/galaxy info :
+    if (h2%datas%nbgal > 0) then
+       call alloc_hlist(h1,h2%datas%nbgal)
+       do i = 1,h2%datas%nbgal
+          call copy_gal_props(h1%datas%liste_galaxies(i),h2%datas%liste_galaxies(i))
+       end do
+    end if
+    
+    !physical props :
+    h1%p                   = h2%p 
+    h1%v                   = h2%v
+    h1%L                   = h2%L
+    h1%sh                  = h2%sh
+    h1%ek                  = h2%ek
+    h1%ep                  = h2%ep
+    h1%et                  = h2%et
+    h1%spin                = h2%spin
+    h1%mfof                = h2%mfof
+    h1%macc                = h2%macc
+    h1%rfof                = h2%rfof
+    h1%halo_profile        = h2%halo_profile
+    h1%datas%rvir          = h2%datas%rvir          
+    h1%datas%mvir          = h2%datas%mvir          
+    h1%datas%tvir          = h2%datas%tvir          
+    h1%datas%cvel          = h2%datas%cvel          
+    h1%datas%mgaz          = h2%datas%mgaz          
+    h1%datas%mhotgaz       = h2%datas%mhotgaz       
+    h1%datas%mcoldgaz      = h2%datas%mcoldgaz      
+    h1%datas%mhotz         = h2%datas%mhotz         
+    h1%datas%mcoldz        = h2%datas%mcoldz        
+
+    h1%datas%mgazout       = h2%datas%mgazout
+    h1%datas%metalsout     = h2%datas%metalsout
+
+    h1%ncont               = h2%ncont
+#ifdef DEFINE_IDS
+    h1%BushID              = h2%BushID
+    h1%HaloID              = h2%HaloID
+#endif
+
+    return
+
+  end subroutine copy_halo_props
+
+!******************************************************************************************************************
+  subroutine clear_halo(h)    
+
+  ! Explicity erase a halo. (set all its props to 0, and nullify its first-level pointers)
+
+    implicit none  
+
+    type (halo)     :: h
+    integer(kind=4) :: i
+
+    !id and formation expansion factor :
+    h%my_number          = 0   ; h%my_timestep      = 0   ; h%my_form_aexp = 0.0d0
+            
+    !physical props :
+    h%p%x                = 0.0d0 ; h%p%y              = 0.0d0 ; h%p%z          = 0.0d0  
+    h%v%x                = 0.0d0 ; h%v%y              = 0.0d0 ; h%v%z          = 0.0d0
+    h%L%x                = 0.0d0 ; h%L%y              = 0.0d0 ; h%L%z          = 0.0d0
+    h%sh%a               = 0.0d0 ; h%sh%b             = 0.0d0 ; h%sh%c         = 0.0d0
+    h%ek                 = 0.0d0 ; h%ep               = 0.0d0 ; h%et           = 0.0d0    
+    h%spin               = 0.0d0 ; h%mfof             = 0.0d0 ; h%rfof         = 0.0d0
+    h%halo_profile%rho_0 = 0.0d0 ; h%halo_profile%r_c = 0.0d0
+    h%macc               = 0.0d0
+
+    !family links :
+    h%tree%frag          = 0
+    if (associated(h%tree%dads)) deallocate(h%tree%dads)
+    h%tree%ndads         = 0
+    if (associated(h%tree%sons)) deallocate(h%tree%sons)
+    h%tree%nsons         = 0
+    if (associated(h%my_fathers%list_fathers)) then
+       deallocate(h%my_fathers%list_fathers)
+       deallocate(h%my_fathers%mass_fathers)
+    end if
+    h%my_fathers%nb_fathers = 0
+    if (associated(h%my_sons%list_sons)) deallocate(h%my_sons%list_sons)
+    h%my_sons%nb_sons       = 0   
+
+    !baryon/galaxy info :
+    if (associated(h%datas%liste_galaxies)) then
+       do i = 1,h%datas%nbgal
+          call clear_galaxy(h%datas%liste_galaxies(i))
+       end do
+       deallocate(h%datas%liste_galaxies)
+    end if
+    h%datas%nbgal = 0 
+
+    h%datas%rvir  = 0.0d0    ;  h%datas%mvir    = 0.0d0  ;  h%datas%tvir         = 0.0d0
+    h%datas%cvel  = 0.0d0
+    h%datas%mgaz  = 0.0d0    ;  h%datas%mhotgaz = 0.0d0  ;  h%datas%mcoldgaz     = 0.0d0
+    h%datas%mhotz = 0.0d0    ;  h%datas%mcoldz  = 0.0d0  
+
+    h%datas%mgazout = 0.0d0  ;  h%datas%metalsout = 0.0d0
+
+    ! contamination
+    h%ncont = 0
+
+#ifdef DEFINE_IDS
+    h%BushID = -1
+    h%haloID = -1
+#endif
+
+    return
+
+  end subroutine clear_halo
+
+!******************************************************************************************************************
+  subroutine init_halo(h)
+
+  ! initialize a halo : nullify all its pointers and set to 0 all its props
+  ! (cannot call clear_halo for newly declared halos because associated function does not work on 
+  ! undefined pointers, which is the initial status).
+
+    implicit none  
+
+    type (halo)     :: h
+
+    !id and formation expansion factor :
+    h%my_number          = 0   ; h%my_timestep      = 0   ; h%my_form_aexp = 0.0d0
+            
+    !physical props :
+    h%p%x                = 0.0d0 ; h%p%y              = 0.0d0 ; h%p%z          = 0.0d0  
+    h%v%x                = 0.0d0 ; h%v%y              = 0.0d0 ; h%v%z          = 0.0d0
+    h%L%x                = 0.0d0 ; h%L%y              = 0.0d0 ; h%L%z          = 0.0d0
+    h%sh%a               = 0.0d0 ; h%sh%b             = 0.0d0 ; h%sh%c         = 0.0d0
+    h%ek                 = 0.0d0 ; h%ep               = 0.0d0 ; h%et           = 0.0d0    
+    h%spin               = 0.0d0 ; h%mfof             = 0.0d0 ; h%rfof         = 0.0d0
+    h%halo_profile%rho_0 = 0.0d0 ; h%halo_profile%r_c = 0.0d0
+    h%macc               = 0.0d0
+
+    !family links :
+    h%tree%frag             = 0
+    nullify(h%tree%dads)
+    h%tree%ndads            = 0
+    nullify(h%tree%sons)
+    h%tree%nsons            = 0
+    nullify(h%my_fathers%list_fathers)
+    nullify(h%my_fathers%mass_fathers)
+    h%my_fathers%nb_fathers = 0
+    nullify(h%my_sons%list_sons)
+    h%my_sons%nb_sons       = 0   
+
+    !baryon/galaxy info :
+    nullify(h%datas%liste_galaxies)
+    h%datas%nbgal = 0 
+
+    h%datas%rvir  = 0.0d0    ;  h%datas%mvir    = 0.0d0  ;  h%datas%tvir         = 0.0d0
+    h%datas%cvel  = 0.0d0
+    h%datas%mgaz  = 0.0d0    ;  h%datas%mhotgaz = 0.0d0  ;  h%datas%mcoldgaz     = 0.0d0
+    h%datas%mhotz = 0.0d0    ;  h%datas%mcoldz  = 0.0d0 
+    h%datas%mgazout = 0.0d0  ;  h%datas%metalsout = 0.0d0
+
+    ! contamination
+    h%ncont = 0
+
+#ifdef DEFINE_IDS
+    h%BushID = -1
+    h%haloID = -1
+#endif
+
+    return
+
+  end subroutine init_halo
+
+!*****************************************************************************************************************
+  subroutine alloc_hlist(h,n)
+
+  ! allocate halos h galaxie's list so that it contains n gals.
+
+    implicit none
+
+    type(halo)      :: h
+    integer(kind=4) :: n,i
+
+    if (h%datas%nbgal > 0) then
+       do i = 1,h%datas%nbgal
+          call clear_galaxy(h%datas%liste_galaxies(i))
+       end do
+       deallocate(h%datas%liste_galaxies)
+    end if
+
+    if (n > 0) then 
+       allocate(h%datas%liste_galaxies(n))
+       h%datas%nbgal = n
+       do i = 1,n
+          call init_galaxy(h%datas%liste_galaxies(i))
+       end do
+    else
+       nullify(h%datas%liste_galaxies)
+       h%datas%nbgal = 0
+    end if    
+
+    return
+
+  end subroutine alloc_hlist
+
+!******************************************************************************************************************
+  subroutine clear_galaxy(g)
+
+  ! initialize all fields of a galaxy
+
+    implicit none
+    
+    type(galaxy) :: g
+
+    g%hno                 = 0
+    g%my_number           = 0
+    g%my_progs%nb_prog    = 0    
+    if (associated(g%my_progs%hno)) then
+       deallocate(g%my_progs%hno)
+    else
+       nullify(g%my_progs%hno)
+    end if
+    if (associated(g%my_progs%gno)) then 
+       deallocate(g%my_progs%gno)
+    else
+       nullify(g%my_progs%gno)
+    end if
+    g%my_girls%hno        = 0
+    g%my_girls%gno        = 0
+    call new_comp(g%disc)
+    call new_comp(g%bulge)
+    call new_comp(g%burst)
+
+    g%QSO%mass            = 0.0d0
+    g%QSO%accretion_rate  = 0.0d0
+    
+    g%core%mass           = 0.0d0
+    g%core%rho_0          = 0.0d0
+    g%core%r_0            = 0.0d0
+    g%core%fdm            = 0.0d0
+    g%r                   = 0.0d0
+    g%tgal                = 0.0d0
+    g%tbirth              = 0.0d0
+    g%tmerge              = 0.0d0
+    g%disturb             = 0.0d0
+#ifndef BIG_RUN   
+    g%contam              = 0
+#endif    
+    g%nb_merg             = 0
+    g%inst_bulg           = 0
+    g%inclination         = 0.0d0
+    g%p%x                 = 0.0d0
+    g%p%y                 = 0.0d0
+    g%p%z                 = 0.0d0
+    g%v%x                 = 0.0d0
+    g%v%y                 = 0.0d0
+    g%v%z                 = 0.0d0
+    
+    call clear_accretion(g%acc)
+    call clear_accretion(g%wind)
+    call clear_gal_bookkeep(g%gbk)
+
+    return
+    
+  end subroutine clear_galaxy
+
+!******************************************************************************************************************
+  subroutine new_comp(comp)
+
+  ! new (zero mass) galaxy component  
+
+    implicit none
+
+    type(gal_comp) :: comp
+
+    comp%mcold       = 0.0d0
+    comp%mgal        = 0.0d0
+    comp%mcoldz      = 0.0d0
+    comp%minstar     = 0.0d0
+    comp%speed       = 0.0d0
+    comp%rgal        = 0.0d0
+    comp%rstrip      = 0.0d0 
+    comp%tdyn        = 0.0d0    
+    comp%sfr1        = 0.0d0
+    comp%sfr10       = 0.0d0
+    comp%sfr100      = 0.0d0
+    comp%transp      = 0.0d0
+#ifdef DUAL_IMF
+    comp%minstar2     = 0.0d0
+    comp%sfr21        = 0.0d0
+    comp%sfr210       = 0.0d0
+    comp%sfr2100      = 0.0d0
+    comp%transp2      = 0.0d0
+#endif
+    if (associated(comp%sfh_tab)) then
+       deallocate(comp%sfh_tab)
+    else
+       nullify(comp%sfh_tab)
+    end if
+#ifdef DUAL_IMF 
+    if (associated(comp%sfh_tab2)) then 
+       deallocate(comp%sfh_tab2)
+    else
+       nullify(comp%sfh_tab2)
+    end if
+#endif    
+   
+#ifdef RECORD_SFR
+    comp%totsfr = 0.0d0
+    if (associated(comp%sfr_tab)) then 
+       deallocate(comp%sfr_tab) 
+    else
+       nullify(comp%sfr_tab)
+    end if
+#ifdef DUAL_IMF
+    comp%totsfr2 = 0.0d0
+    if (associated(comp%sfr_tab2)) then 
+       deallocate(comp%sfr_tab2) 
+    else
+       nullify(comp%sfr_tab2)
+    end if
+#endif
+#endif
+
+    return
+
+  end subroutine new_comp
+
+!******************************************************************************************************************
+  subroutine erase_comp(comp)
+
+  ! erase an already existing component which mass is too small  
+
+    implicit none
+
+    type(gal_comp) :: comp
+
+    comp%mcold       = 0.0d0
+    comp%mgal        = 0.0d0
+    comp%mcoldz      = 0.0d0
+    if (comp%minstar > 0.0d0) deallocate(comp%sfh_tab)
+    comp%minstar     = 0.0d0
+#ifdef DUAL_IMF 
+    if (comp%minstar2 > 0.0d0) deallocate(comp%sfh_tab2)
+    comp%minstar2     = 0.0d0
+    comp%sfr21        = 0.0d0
+    comp%sfr210       = 0.0d0
+    comp%sfr2100      = 0.0d0
+    comp%transp2      = 0.0d0
+#endif    
+    comp%speed       = 0.0d0
+    comp%rgal        = 0.0d0
+    comp%rstrip      = 0.0d0 
+    comp%tdyn        = 0.0d0    
+    comp%sfr1        = 0.0d0
+    comp%sfr10       = 0.0d0
+    comp%sfr100      = 0.0d0
+    comp%transp      = 0.0d0
+
+#ifdef RECORD_SFR 
+    if (comp%totsfr > 0.0d0) deallocate(comp%sfr_tab) 
+    comp%totsfr = 0.0d0
+#ifdef DUAL_IMF
+    if (comp%totsfr2 > 0.0d0) deallocate(comp%sfr_tab2) 
+    comp%totsfr2 = 0.0d0
+#endif
+#endif
+
+    return
+
+  end subroutine erase_comp
+
+!*****************************************************************************************************************
+  subroutine new_QSO(QSO)
+
+  ! new (zero mass) bhgal
+
+    implicit none
+
+    type(quasar) :: QSO 
+
+    QSO%mass           = 0.0d0
+    QSO%accretion_rate = 0.0d0
+
+    return
+
+  end subroutine new_QSO
+
+!******************************************************************************************************************
+  subroutine copy_gal_props(g1,g2)  
+
+  ! g1 = g2 - explicitly, but without copying any pointers. 
+  ! NB : g1 may already be defined and this routine has to overwrite it --> deallocate g1 before
+
+    implicit none
+
+    type(galaxy)    :: g1,g2
+
+    call clear_galaxy(g1)
+
+    ! copy galaxy ID
+    g1%hno                 = g2%hno
+    g1%my_number           = g2%my_number
+    ! put progs of g2 into g1, if any
+    if (g2%my_progs%nb_prog > 0) then
+       g1%my_progs%nb_prog = g2%my_progs%nb_prog
+       allocate(g1%my_progs%hno(g2%my_progs%nb_prog))
+       g1%my_progs%hno     = g2%my_progs%hno
+       allocate(g1%my_progs%gno(g2%my_progs%nb_prog))
+       g1%my_progs%gno     = g2%my_progs%gno
+    end if
+    ! copy descendent ID
+    g1%my_girls%hno        = g2%my_girls%hno
+    g1%my_girls%gno        = g2%my_girls%gno
+    ! copy properties of gal components: disc, bulge and burst
+    call copy_comp_props(g1%disc ,g2%disc )
+    call copy_comp_props(g1%bulge,g2%bulge)
+    call copy_comp_props(g1%burst,g2%burst)
+
+    g1%QSO%mass            = g2%QSO%mass 
+    g1%QSO%accretion_rate  = g2%QSO%accretion_rate
+
+    ! copy properties of DM cores attached to galaxies
+    call copy_core_props(g1%core,g2%core)
+    ! copy global properties of galaxy
+    g1%r                   = g2%r 
+    g1%tgal                = g2%tgal
+    g1%tbirth              = g2%tbirth
+    g1%tmerge              = g2%tmerge
+    g1%disturb             = g2%disturb
+#ifndef BIG_RUN   
+    g1%contam              = g2%contam
+#endif    
+    g1%nb_merg             = g2%nb_merg
+    g1%inst_bulg           = g2%inst_bulg
+    g1%inclination         = g2%inclination
+    g1%p%x                 = g2%p%x
+    g1%p%y                 = g2%p%y
+    g1%p%z                 = g2%p%z
+    g1%v%x                 = g2%v%x
+    g1%v%y                 = g2%v%y
+    g1%v%z                 = g2%v%z
+
+    call copy_accretion(g1%acc,g2%acc)
+    call copy_accretion(g1%wind,g2%wind)
+    call copy_gal_bookkeep(g1%gbk,g2%gbk)
+
+    return
+
+  end subroutine copy_gal_props
+
+!*****************************************************************************************************************
+  subroutine copy_core_props(c1,c2)
+
+    implicit none
+
+    type(DM_core) :: c1,c2
+
+    c1%mass  = c2%mass
+    c1%r_0   = c2%r_0
+    c1%rho_0 = c2%rho_0  
+    c1%fdm   = c2%fdm
+
+  end subroutine copy_core_props
+    
+!*****************************************************************************************************************
+  subroutine copy_comp_props(c1,c2)
+
+    implicit none
+
+    type(gal_comp) :: c1,c2
+
+    c1%mgal        = c2%mgal
+    c1%rgal        = c2%rgal
+    c1%mcold       = c2%mcold
+    c1%tdyn        = c2%tdyn
+    c1%minstar     = c2%minstar
+    c1%rstrip      = c2%rstrip
+    c1%sfr1        = c2%sfr1
+    c1%sfr10       = c2%sfr10
+    c1%sfr100      = c2%sfr100
+    c1%mcoldz      = c2%mcoldz
+    c1%speed       = c2%speed
+    c1%transp      = c2%transp
+    if (c2%minstar > 0.0d0) then
+       allocate(c1%sfh_tab(size(c2%sfh_tab,dim=1),nfile))
+       c1%sfh_tab  = c2%sfh_tab
+    end if
+#ifdef DUAL_IMF
+    c1%minstar2     = c2%minstar2
+    c1%sfr21        = c2%sfr21
+    c1%sfr210       = c2%sfr210
+    c1%sfr2100      = c2%sfr2100
+    c1%transp2      = c2%transp2
+    if (c2%minstar2 > 0.0d0) then
+       allocate(c1%sfh_tab2(size(c2%sfh_tab2,dim=1),nfile))
+       c1%sfh_tab2 = c2%sfh_tab2
+    end if
+#endif
+
+#ifdef RECORD_SFR
+    c1%totsfr = c2%totsfr
+    if (c2%totsfr > 0.0d0) then 
+       allocate(c1%sfr_tab(size(c2%sfr_tab,dim=1),nfile))
+       c1%sfr_tab = c2%sfr_tab
+    end if
+#ifdef DUAL_IMF
+    c1%totsfr2 = c2%totsfr2
+    if (c2%totsfr2 > 0.0d0) then 
+       allocate(c1%sfr_tab2(size(c2%sfr_tab2,dim=1),nfile))
+       c1%sfr_tab2 = c2%sfr_tab2
+    end if
+#endif    
+#endif
+
+    return 
+
+  end subroutine copy_comp_props
+
+!*****************************************************************************************************************
+  subroutine init_galaxy(g)
+
+  ! initialize all fields of a galaxy (nullify pointers)
+
+    implicit none
+    
+    type(galaxy) :: g
+
+    g%hno                 = 0
+    g%my_number           = 0
+    g%my_progs%nb_prog    = 0    
+    nullify(g%my_progs%hno)
+    nullify(g%my_progs%gno)
+    g%my_girls%hno        = 0
+    g%my_girls%gno        = 0
+    call init_comp(g%disc)
+    call init_comp(g%bulge)
+    call init_comp(g%burst)
+    g%QSO%mass            = 0.0d0
+    g%QSO%accretion_rate  = 0.0d0
+    g%core%mass           = 0.0d0
+    g%core%rho_0          = 0.0d0
+    g%core%r_0            = 0.0d0
+    g%core%fdm            = 0.0d0
+    g%r                   = 0.0d0
+    g%tgal                = 0.0d0
+    g%tbirth              = 0.0d0
+    g%tmerge              = 0.0d0
+    g%disturb             = 0.0d0
+#ifndef BIG_RUN   
+    g%contam              = 0
+#endif    
+    g%nb_merg             = 0
+    g%inst_bulg           = 0
+    g%inclination         = 0.0d0
+    g%v%x                 = 0.0d0
+    g%v%y                 = 0.0d0
+    g%v%z                 = 0.0d0
+    
+    call clear_accretion(g%acc)
+    call clear_accretion(g%wind)
+    call clear_gal_bookkeep(g%gbk)
+
+    return
+
+  end subroutine init_galaxy
+
+!******************************************************************************************************************
+  subroutine init_comp(comp)
+
+  ! new (zero mass) galaxy component  
+
+    implicit none
+
+    type(gal_comp) :: comp
+
+    comp%mcold       = 0.0d0
+    comp%mgal        = 0.0d0
+    comp%mcoldz      = 0.0d0
+    comp%minstar     = 0.0d0
+    comp%speed       = 0.0d0
+    comp%rgal        = 0.0d0
+    comp%rstrip      = 0.0d0 
+    comp%tdyn        = 0.0d0    
+    comp%sfr1        = 0.0d0
+    comp%sfr10       = 0.0d0
+    comp%sfr100      = 0.0d0
+    comp%transp      = 0.0d0
+    nullify(comp%sfh_tab)
+#ifdef DUAL_IMF 
+    comp%minstar2     = 0.0d0
+    comp%sfr21        = 0.0d0
+    comp%sfr210       = 0.0d0
+    comp%sfr2100      = 0.0d0
+    comp%transp2      = 0.0d0
+    nullify(comp%sfh_tab2) 
+#endif
+#ifdef RECORD_SFR
+    comp%totsfr       = 0.0d0
+    nullify(comp%sfr_tab)
+#ifdef DUAL_IMF
+    comp%totsfr2      = 0.0d0
+    nullify(comp%sfr_tab2)
+#endif
+#endif
+
+    return
+
+  end subroutine init_comp
+
+!******************************************************************************************************************
+   subroutine compute_IGM_props(st)
+    
+    implicit none
+
+    integer(kind=4),intent(in) :: st
+    real(kind=8)               :: zplus1,zplus1_prev
+#ifdef RENUMBERING
+    real(kind=8)               :: t_reheat ! temperature of IGM just after reionisation (K) 
+#else
+    real(kind=8),parameter     :: t_reheat = 3.0e4  ! temperature of IGM just after reionisation (K) 
+    real(kind=8)               :: mass_b, dtigm
+    real(kind=8),parameter     :: fact     = 2.4e10 ! is mu*mp*Esn / (3/2 k_B), in M_sun K
+#endif
+    
+#ifdef RENUMBERING
+    t_reheat = global_t_igm
+#endif
+
+    if (st > 1) then
+
+       zplus1      = tsno(nsteps)%aexp / tsno(st)%aexp
+       zplus1_prev = tsno(nsteps)%aexp / tsno(st-1)%aexp
+       if (zplus1 > z_reionisation + 1.0d0) then
+          tsno(st)%t_igm = (zplus1 / 100.0d0)**2 * 300.0d0  ! 
+       else
+
+#ifdef RENUMBERING
+          tsno(st)%t_igm = t_reheat
+#else
+          if (zplus1_prev > z_reionisation + 1.0d0) then
+             tsno(st)%t_igm = t_reheat
+          else
+             mass_b         = omega_b * 2.7755d0 * hubble**2 * Lbox_phys**3     ! 2.7755 is critical density
+#ifdef DUAL_IMF              
+             dtigm          = alpha_reheat * fact * eta_sn * tsno(st)%global_SF / mass_b &
+                  + alpha_reheat * fact * eta_sn2 * tsno(st)%global_SF2 / mass_b
+#else
+             dtigm          = alpha_reheat * fact * eta_sn * tsno(st)%global_SF / mass_b
+#endif
+             tsno(st)%t_igm = tsno(st-1)%t_igm - 2.0d0 * zplus1 * (zplus1_prev - zplus1) / &
+                  &(1.0d0 + z_reionisation)**2 * t_reheat + dtigm
+          end if
+          
+#endif
+!RENUMBERING
+       end if
+       
+    else
+       
+       zplus1      = tsno(nsteps)%aexp / tsno(st)%aexp
+       if (zplus1 > z_reionisation + 1.0d0) then
+          tsno(st)%t_igm = (zplus1 / 100.0d0)**2 * 300.0d0  ! 
+       else
+          tsno(st)%t_igm = (zplus1 / (z_reionisation + 1.0d0))**2 * t_reheat 
+       end if
+
+    end if
+
+    return
+    
+  end subroutine compute_IGM_props
+!******************************************************************************************************************
+
+  subroutine modif_halogas_props(hbm,ham)
+
+    implicit none 
+
+    type(halo) :: ham, hbm
+    
+    ham%datas%mcoldgaz  = hbm%datas%mcoldgaz
+    ham%datas%mcoldz    = hbm%datas%mcoldz
+    ham%datas%mhotgaz   = hbm%datas%mhotgaz
+    ham%datas%mhotz     = hbm%datas%mhotz
+    ham%datas%mgaz      = ham%datas%mcoldgaz + ham%datas%mhotgaz
+    
+    ham%datas%mgazout   = hbm%datas%mgazout
+    ham%datas%metalsout = hbm%datas%metalsout
+
+    return
+
+  end subroutine modif_halogas_props
+
+!******************************************************************************************************************
+  subroutine reset_sfr(g)
+
+    implicit none 
+    
+    type(galaxy) :: g
+    
+    g%disc%sfr1    = 0.0d0
+    g%disc%sfr10   = 0.0d0
+    g%disc%sfr100  = 0.0d0
+    g%bulge%sfr1   = 0.0d0
+    g%bulge%sfr10  = 0.0d0
+    g%bulge%sfr100 = 0.0d0
+    g%burst%sfr1   = 0.0d0
+    g%burst%sfr10  = 0.0d0
+    g%burst%sfr100 = 0.0d0
+#ifdef DUAL_IMF
+    g%disc%sfr21    = 0.0d0
+    g%disc%sfr210   = 0.0d0
+    g%disc%sfr2100  = 0.0d0
+    g%bulge%sfr21   = 0.0d0
+    g%bulge%sfr210  = 0.0d0
+    g%bulge%sfr2100 = 0.0d0
+    g%burst%sfr21   = 0.0d0
+    g%burst%sfr210  = 0.0d0
+    g%burst%sfr2100 = 0.0d0
+#endif
+    
+    return
+
+  end subroutine reset_sfr
+
+!******************************************************************************************************************
+!/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+end module INIT_BARYONS

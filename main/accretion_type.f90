@@ -1,0 +1,215 @@
+module accretion_type
+
+  ! routines and data types used to describe an accretion flows
+
+  public
+
+  real(kind=8),parameter    :: accretion_deltat   = 0.01 ! Gyr -> 10Myr 
+  integer(kind=4),parameter :: MaxAccretionEvents = 1400 ! -> only < 1400 bins to cover age of universe 
+  ! NB : it is necessary to go beyound age of universe so we have a cell to stack all late infalling stuff
+  type accretion      
+     real(kind=8)           :: accretion_rate(MaxAccretionEvents)
+     real(kind=8)           :: accretion_ratez(MaxAccretionEvents)
+  end type accretion
+  
+contains
+
+  !*****************************************************************************************************************
+  subroutine clear_accretion(a)
+    
+    implicit none
+    
+    type(accretion) :: a
+    
+    a%accretion_rate    = 0.0d0
+    a%accretion_ratez   = 0.0d0
+    
+    return
+    
+  end subroutine clear_accretion
+
+!******************************************************************************************************************
+
+  subroutine add_accretion_event(acc,accrate,accratez,accstart,accstop)
+
+    ! add/create an accretion event into acc
+    ! event comes in with rates between accstart and accstop -> rebin onto fixed acc grid
+
+    implicit none
+
+    type(accretion)          :: acc
+    real(kind=8)             :: accrate,accratez,accstart,accstop
+    integer(kind=4)          :: istart,istop,i
+    real(kind=8)             :: dacc, t1, t2, dt
+
+    istart = int(accstart / accretion_deltat)
+    if (istart > MaxAccretionEvents) istart = MaxAccretionEvents
+    if (istart < 1) istart = 1
+    istop  = int(accstop / accretion_deltat)
+    if (istop > MaxAccretionEvents) istop = MaxAccretionEvents
+    if (istop < 1) istop = 1
+
+    if (istart == istop) then ! -> new accretion event fits in a cell : get rid of simple case quick
+
+       acc%accretion_rate(istart)  = acc%accretion_rate(istart)  + accrate  * (accstop-accstart) / accretion_deltat
+       acc%accretion_ratez(istart) = acc%accretion_ratez(istart) + accratez * (accstop-accstart) / accretion_deltat
+
+    else 
+
+       ! deal with istart bin first
+       dt = (istart + 1) * accretion_deltat - accstart
+       acc%accretion_rate(istart)  = acc%accretion_rate(istart)  + accrate  * dt / accretion_deltat
+       acc%accretion_ratez(istart) = acc%accretion_ratez(istart) + accratez * dt / accretion_deltat
+       ! then all bins till istop are the same : just add the rate
+       do i = istart + 1, istop - 1 
+          acc%accretion_rate(i)  = acc%accretion_rate(i)  + accrate
+          acc%accretion_ratez(i) = acc%accretion_ratez(i) + accratez
+       end do
+       ! finally, deal with istop
+       dt = accstop - istop * accretion_deltat
+       acc%accretion_rate(istop)  = acc%accretion_rate(istop)  + accrate  * dt / accretion_deltat
+       acc%accretion_ratez(istop) = acc%accretion_ratez(istop) + accratez * dt / accretion_deltat
+       
+    end if
+
+    return
+    
+  end subroutine add_accretion_event
+
+  !******************************************************************************************************************
+
+  subroutine merge_accretion_events(acc1,acc2)
+
+    ! add acc2 to acc1 
+
+    implicit none
+
+    type(accretion)  :: acc1,acc2
+
+    acc1%accretion_rate  = acc1%accretion_rate  + acc2%accretion_rate
+    acc1%accretion_ratez = acc1%accretion_ratez + acc2%accretion_ratez
+
+    return
+
+  end subroutine merge_accretion_events
+
+  !******************************************************************************************************************
+
+  subroutine copy_accretion(acc1,acc2)
+    
+    ! copy acc2 into acc1 (erase acc1)
+
+    implicit none
+    
+    type(accretion) :: acc1,acc2
+
+    acc1%accretion_rate  = acc2%accretion_rate
+    acc1%accretion_ratez = acc2%accretion_ratez
+
+    return
+
+  end subroutine copy_accretion
+
+!******************************************************************************************************************
+
+  subroutine accretion_mass(a,t1,t2,macc,maccz)
+    
+    ! compute total mass in the flow that will reach a galaxy between times t1 and t2
+    ! -> both mass of gas and mass of metals
+    implicit none
+    
+    type(accretion) :: a
+    real(kind=8)    :: t1,t2,macc,maccz,dt
+    integer(kind=4) :: istart,istop,i
+    
+    istart = int(t1 / accretion_deltat)
+    if (istart > MaxAccretionEvents) istart = MaxAccretionEvents
+    if (istart < 1) istart = 1
+    istop  = int(t2 / accretion_deltat)
+    if (istop > MaxAccretionEvents) istop = MaxAccretionEvents
+    if (istop < 1) istop = 1
+    
+    if (istart == istop) then ! t1 and t2 fall in same acc bin
+       macc  = a%accretion_rate(istart)  * (t2 - t1)
+       maccz = a%accretion_ratez(istart) * (t2 - t1)
+    else
+       ! contribution to macc of istart 
+       macc  = a%accretion_rate(istart)  * ((istart + 1) * accretion_deltat - t1)
+       maccz = a%accretion_ratez(istart) * ((istart + 1) * accretion_deltat - t1)
+       ! contribution to macc of istop
+       macc  = macc  + a%accretion_rate(istop)  * (t2 - istop * accretion_deltat)
+       maccz = maccz + a%accretion_ratez(istop) * (t2 - istop * accretion_deltat)
+       ! other bins 
+       do i = istart+1,istop-1
+          macc  = macc  + a%accretion_rate(i)  * accretion_deltat
+          maccz = maccz + a%accretion_ratez(i) * accretion_deltat
+       end do
+    end if
+
+    return
+
+  end subroutine accretion_mass
+
+  !*****************************************************************************************************************
+
+  function accretion_remaining_mass(a,t)
+    
+    ! compute mass in the accretion flow from t to infinity
+    implicit none 
+
+    type(accretion) :: a
+    real(kind=8)    :: t, accretion_remaining_mass,m
+    integer(kind=4) :: istart,i
+
+    m = 0.0d0
+    istart  = int(t / accretion_deltat)
+    if (istart >= MaxAccretionEvents) then 
+       print*, 'Error (in accretion_remaining_mass) : istart > MaxAccretionEvents'
+       stop
+    end if
+    if (istart < 1) istart = 1  ! nothing happens in the first 10Myr of the Universe as far as we're concerned... 
+
+    do i = istart+1,MaxAccretionEvents  ! we sum the mass to be accreted later => it corresponds to the mass present in the wind at istart = timestep we look at
+       m = m + a%accretion_rate(i)
+    end do
+    m = m * accretion_deltat
+    m = m + a%accretion_rate(istart)  * ((istart + 1) * accretion_deltat - t) ! here, we calculate what will be removed from the wind (= accreted) between [(istart + 1) * accretion_deltat] and t    : istart < t < istart+1
+    accretion_remaining_mass = m
+
+    return
+
+  end function accretion_remaining_mass
+
+  !*****************************************************************************************************************
+
+function accretion_remaining_mass_z(a,t)
+    
+    ! compute mass in the accretion flow from t to infinity
+    implicit none 
+
+    type(accretion) :: a
+    real(kind=8)    :: t, accretion_remaining_mass_z,m
+    integer(kind=4) :: istart,i
+
+    m = 0.0d0
+    istart  = int(t / accretion_deltat)
+    if (istart >= MaxAccretionEvents) then 
+       print*, 'Error (in accretion_remaining_mass) : istart > MaxAccretionEvents'
+       stop
+    end if
+    if (istart < 1) istart = 1  ! nothing happens in the first 10Myr of the Universe as far as we're concerned... 
+
+    do i = istart+1,MaxAccretionEvents  ! we sum the mass to be accreted later => it corresponds to the mass present in the wind at istart = timestep we look at
+       m = m + a%accretion_ratez(i)
+    end do
+    m = m * accretion_deltat
+    m = m + a%accretion_ratez(istart)  * ((istart + 1) * accretion_deltat - t) ! here, we calculate what will be removed from the wind (= accreted) between [(istart + 1) * accretion_deltat] and t    : istart < t < istart+1
+    accretion_remaining_mass_z = m
+
+    return
+
+  end function accretion_remaining_mass_z
+
+  !*****************************************************************************************************************
+
+end module accretion_type

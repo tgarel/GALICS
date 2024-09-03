@@ -1,0 +1,36 @@
+# Physical parameters for GalaxMaker (v. 2)
+# -----------------------------------------
+
+# N-body simulation and cosmology
+# -------------------------------
+omega_0        = 0.300         ! amount of dark matter 
+omega_b        = 0.044         ! amount of baryons  
+hub            = 0.700         ! reduced hubble parameter  
+Lbox           = 142.85714     ! size of the box in physical Mpc 
+treefile       = ./tree_file 
+nsteps_do      = 80   ! number of timesteps to compute 
+
+# Astrophysics
+# ------------
+alphapar          = 0.020         ! star formation efficiency 
+epsilon           = 0.20          ! feedback efficiency  
+psi               = 0.017         ! SS merging normalization 
+chi               = 3.333         ! power-law for merging galaxies mass distribution 
+IMF               = kenn          ! initial mass function : kennicutt, salpeter or scalo 
+meta_stable       = 1.2           ! disc (over-)instability parameter
+disc_instability_threshhold = 0.4 ! disc instability parameter 
+z_reionisation    = 10.0          ! redshift at which reionisation is completed 
+alpha_reheat      = 0.001         ! efficiency of SN heating on the IGM 
+delay_fountain    = 2.0           ! starts fountain delay_fountain times the halo t_dyn later
+duration_fountain = 2.0           ! extends the fountain delay_fountain times the halo t_dyn 
+logMmin           = -0.5          ! below this halo mass, all gas comes in cold
+logMmax           = 1.5           ! above this mass all comes in hot. 
+ColdAccretionZ    = 0.001         ! metallicity of cold accretion streams
+frac_acc_to_burst = 0.2           ! fraction of accreted gas going directly to the burst component 
+
+# Input-Outputs 
+# -------------
+inputpath      = /data/blaizot/GM_Inputs/   ! tabulated inputs for spectra and gas
+filterpath     = /data/blaizot/Filters/     ! Filter curves
+spec_dir       = ./spectra/                 ! where to output spectra
+momaf_snap_dir = ./Snapshots/               ! where to output momaf inputs

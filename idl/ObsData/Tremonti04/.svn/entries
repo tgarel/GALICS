@@ -1,0 +1,52 @@
+8
+
+dir
+157
+svn+ssh://garel@octopus.univ-lyon1.fr/home/blaizot/svn/GalaxyMaker/idl/ObsData/Tremonti04
+svn+ssh://garel@octopus.univ-lyon1.fr/home/blaizot/svn
+
+
+
+2008-09-23T14:44:47.190695Z
+11
+blaizot
+
+
+svn:special svn:externals svn:needs-lock
+
+
+
+
+
+
+
+
+
+
+
+87508296-80dc-11dd-839a-b11695017e98
+
+tremonti.txt
+file
+
+
+
+
+2010-01-26T14:22:49.000000Z
+2e699bea55ad1338aeeef2f41c69af58
+2008-09-23T14:44:47.190695Z
+11
+blaizot
+
+read_tremonti.pro
+file
+
+
+
+
+2010-01-26T14:22:49.000000Z
+a23310f77993a185fa444af416fb8867
+2008-09-23T14:44:47.190695Z
+11
+blaizot
+

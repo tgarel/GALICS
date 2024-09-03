@@ -1,0 +1,11 @@
+3	4
+10.50	-3.479 -3.332 -3.597
+11.00	-3.745 -3.612 -3.922
+11.50	-4.439 -3.966 -5.103
+
+# Drory 05 GOODS data 4.0<z<5.0, Mstar 
+# Column 1 log10 M_star
+# Column 2 log10 Phi = log10 dN/dM_star (Mpc^-3 dex^-1)
+# Column 2 log10 Phi_up
+# Column 2 log10 Phi_down 
+

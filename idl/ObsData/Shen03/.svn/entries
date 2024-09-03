@@ -1,0 +1,52 @@
+8
+
+dir
+157
+svn+ssh://garel@octopus.univ-lyon1.fr/home/blaizot/svn/GalaxyMaker/idl/ObsData/Shen03
+svn+ssh://garel@octopus.univ-lyon1.fr/home/blaizot/svn
+
+
+
+2008-09-23T14:44:47.190695Z
+11
+blaizot
+
+
+svn:special svn:externals svn:needs-lock
+
+
+
+
+
+
+
+
+
+
+
+87508296-80dc-11dd-839a-b11695017e98
+
+shen_sizelum.pro
+file
+
+
+
+
+2010-01-26T14:22:49.000000Z
+be0da00243ea73cd0cb657619b829a9c
+2008-09-23T14:44:47.190695Z
+11
+blaizot
+
+shen_lognormal.pro
+file
+
+
+
+
+2010-01-26T14:22:49.000000Z
+e71419790e6103ff8cb1f7c76a583553
+2008-09-23T14:44:47.190695Z
+11
+blaizot
+

@@ -1,0 +1,13 @@
+# Parameters for code build_db_tables.f90
+# 
+
+gmdir = /simu3/garel/GM-RUNS/1024-100h-1Mpc-W5/NewSimu_z0/sf5_zmigr_z0_article2_MOMAF_newFilters2/
+
+halotables   = .false.
+halomomaf    = .false.
+galaxytables = .false.
+galaxymomaf  = .true.
+
+nsteps       = 94
+nsubdirs     = 177
+

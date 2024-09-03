@@ -1,0 +1,66 @@
+#
+# Makefile for DB-software package
+#
+
+OPTIONS    = 
+
+#MACHINE    = "meso"
+#F90C       = pgf90
+#CC         = gcc 
+#DEBUG      = -Minform=warn -g -C -Mnofprelaxed -Mchkptr
+#OPTIM      = -O2 -Mnofprelaxed
+#FFLAGS     = -tp k8-64 -mcmodel=medium -Mlarge_arrays -Mpreprocess -Mextend  ${DEBUG}
+
+MACHINE    = "democrite"
+F90C       = ifort
+CC         = gcc 
+DEBUG      = -g -CB -fp-stack-check -fpe0 -traceback -warn
+OPTIM      = -O2 -fp-model precise
+FFLAGS     = -cpp ${OPTIM}
+
+
+
+# MACHINE    = "other"
+# F90C       = gfortran
+# CC         = gcc 
+# DEBUG      = -g -Wall -Wextra -fbounds-check -fimplicit-none -pedantic  -Wsurprising 
+# OPTIM      = -O2 
+# FFLAGS     = ${DEBUG}
+
+
+DBSUBS     = utils.o momaf_ios.o
+
+.SUFFIXES: .o .or .f90 
+
+ifeq ("$(F90C)", "gfortran")
+FFLAGS_COMP = $(FFLAGS) -x f95-cpp-input
+else
+FFLAGS_COMP = $(FFLAGS)
+endif
+
+
+# Rules:
+.f90.o:	
+	$(F90C) $(FFLAGS_COMP) $(OPTIONS) -c $<
+.c.o:
+	$(CC) -c $<
+
+all:	momaf_wrapup halo_tables galaxy_tables clean
+
+
+default: all 
+
+clean: 	
+	rm -f *.o
+	rm -f *.mod
+	rm -f *~
+
+build_db_tables: ${DBSUBS} build_db_tables.o
+	${F90C} ${FFLAGS} ${OPTIONS} ${DBSUBS} build_db_tables.o -o build_db_tables
+momaf_wrapup:   ${DBSUBS}  momaf_wrapup.o
+	${F90C} ${FFLAGS} $(OPTIONS) ${DBSUBS} momaf_wrapup.o -o momaf_wrapup
+halo_tables:	${DBSUBS} halo_tables.o
+	${F90C} ${FFLAGS} $(OPTIONS) ${DBSUBS} halo_tables.o -o halo_tables
+galaxy_tables:	${DBSUBS} galaxy_tables.o
+	${F90C} ${FFLAGS} $(OPTIONS) ${DBSUBS} galaxy_tables.o -o galaxy_tables
+

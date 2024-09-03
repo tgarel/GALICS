@@ -1,0 +1,142 @@
+program halo_tables
+
+  ! read the outputs of GalaxyMaker and generate ready-to-load halo tables 
+
+  use utils
+
+  implicit none
+
+  character(200)  :: filename,dbdir,numrun
+  integer(kind=4) :: nruns,irun
+  integer(kind=4) :: nsteps,ts,dum,nh,ih
+  real(kind=4)    :: dummy
+  integer(kind=8) :: BushID,TreeID,HaloID,DescendantID,FirstProgenitorID,NextProgenitorID,LastProgenitorID
+  integer(kind=4) :: hno,nbgal
+  real(kind=4)    :: mfof,mvir,mcoldgas,mtemp,mhotgas,mhotz,mcolz,rcool,rfof,rvir,tvir,fhtemp,rc,rho0,tcmt,mstar,metsinstars
+  real(kind=4)    ::  x,y,z,vx,vy,vz,lx,ly,lz,ek,ep,et,spin
+
+!!$  nsteps = 73
+!!$  nruns  = 4
+!!$  write(dbdir,'(a)') "/data9/blaizot/256-100h-1Mpc/DBTables/"
+!!$  write(gmdir,'(a)') "/data9/blaizot/256-100h-1Mpc/DBGM/"
+  nsteps = 80
+  nruns  = 8
+  write(dbdir,'(a)') "/data9/blaizot/512-100h-1Mpc-W3/DBTables/"
+  write(gmdir,'(a)') "/data9/blaizot/512-100h-1Mpc-W3/DBGM/"
+
+  ! write meta-data
+  write(filename,'(a,a,a)') trim(dbdir),'halo_table.metadb'
+  open(unit=metaunit,file=filename,status='unknown',form='formatted')
+  call write_xml_header(metaunit)
+  
+  ! open script file (script will remove stupid spaces and join all files into one).
+  write(filename,'(a,a)') trim(dbdir),'PrepareHaloForDB.sh'
+  open(unit=scriptunit,file=filename,status='unknown',form='formatted')
+
+  ! read/write data 
+  do ts = 1,nsteps 
+     write(errunit,*) ts
+     write(filename,'(a,a,i3.3,a)') trim(dbdir),'halo_table_',ts,'.db'
+     open(unit=halounit,file=filename,status='unknown',form='formatted')
+     call write_script_line(filename,scriptunit)
+     do irun = 1,nruns
+        numrun = irun2string(irun)
+        write(filename,'(a,a,a,i3.3)') trim(gmdir),trim(numrun),'/halo-gas_results.',ts
+        open(unit=hgrunit,file=filename,status='old',form='formatted')
+        read(hgrunit,*) ! skip header
+        write(filename,'(a,a,a,i3.3)') trim(gmdir),trim(numrun),'/halo_dm_results.',ts
+        open(unit=hdmunit,file=filename,status='old',form='formatted')
+        read(hdmunit,*) ! skip header
+        write(filename,'(a,a,a,i3.3)') trim(gmdir),trim(numrun),'/HaloIDs.',ts
+        open(unit=hidunit,file=filename,status='old',form='formatted')
+        read(hidunit,*) nh
+        do ih = 1,nh
+           read(hidunit,'(7(i16,1x))') BushID,TreeID,HaloID,DescendantID,FirstProgenitorID,NextProgenitorID,LastProgenitorID
+           read(hgrunit,'(i8,1x,12(e14.6,1x),i6,1x,5(e14.6,1x))') &
+                hno,mfof,mvir,mcoldgas,mtemp,mhotgas,mhotz,mcolz,rcool,rfof,rvir,tvir,fhtemp,nbgal,rc,rho0,tcmt,mstar,metsinstars
+           read(hdmunit,'(13(e14.6,1x))') x,y,z,vx,vy,vz,lx,ly,lz,ek,ep,et,spin
+           write(halounit,'(i16,1x,i4,1x,6(i16,1x),19(e14.6,1x))') &
+                HaloID, ts, TreeID, BushID, LastProgenitorID, DescendantID, FirstProgenitorID, NextProgenitorID, &
+                x, y, z, vx, vy, vz, lx, ly, lz, spin, &
+                mfof,rfof,mvir,rvir,tvir,mcoldgas,mhotgas,mhotz,mcolz
+        end do
+        close(hgrunit) ; close(hdmunit) ; close(hidunit)
+     end do
+     close(halounit)
+     write(filename,'(a,a,a,i3.3,a)') '<LINK content-role="location" content-type="ascii" href="file:',trim(dbdir),'halo_table_',ts,'.db"/>'
+     write(metaunit,'(a)') filename
+  end do
+  
+  call write_xml_footer(metaunit)
+  close(metaunit)
+
+  ! finish script
+  write(scriptunit,'(a)') "cat halo_table*.tmp > halo.db ; rm -f halo_table*.tmp"
+  write(scriptunit,'(a)') "gzip halo.db"
+  close(scriptunit)
+ 
+
+  stop
+
+contains
+
+  subroutine write_xml_header(unit)
+
+    implicit none 
+
+    integer(kind=4) :: unit
+
+    write(unit,'(a)') '<?xml version="1.0" encoding="UTF-8"?>'
+    write(unit,'(a)') '<VOTABLE xmlns="http://www.ivoa.net/xml/VOTable/v1.1">'
+    write(unit,'(a)') '<INFO name="createDate" value="3-3-2008"/>'
+    write(unit,'(a)') '<INFO name="owner" value="Jeremy Blaizot"/>'
+    write(unit,'(a)') '<RESOURCE>'
+    write(unit,'(a)') '<TABLE name="Halo">'
+    write(unit,'(a)') '<DESCRIPTION> results from HaloMaker, TreeMaker and GalaxyMaker </DESCRIPTION>'
+    write(unit,'(a)') '<FIELD name="HaloID" datatype="bigint" unit="" ucd=""><DESCRIPTION>Unique Halo ID.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="SnapNum" datatype="int" unit="" ucd=""><DESCRIPTION>Unique Halo ID.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="TreeID" datatype="bigint" unit="" ucd=""><DESCRIPTION>Unique Tree ID.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="BushID" datatype="bigint" unit="" ucd=""><DESCRIPTION>Unique Bush ID.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="LastProgenitorID" datatype="bigint" unit="" ucd=""><DESCRIPTION>Points to HaloID of last progenitor.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="DescendantID" datatype="bigint" unit="" ucd=""><DESCRIPTION>Points to HaloID of descendant halo.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="FirstProgenitorID" datatype="bigint" unit="" ucd=""><DESCRIPTION>Points to HaloID of first progenitor.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="NextProgenitorID" datatype="bigint" unit="" ucd=""><DESCRIPTION>Points to HaloID of next progenitor.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="x" datatype="float" unit="Mpc/h" ucd=""><DESCRIPTION>Cartesian x coordinate, comoving.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="y" datatype="float" unit="Mpc/h" ucd=""><DESCRIPTION>Cartesian y coordinate, comoving.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="z" datatype="float" unit="Mpc/h" ucd=""><DESCRIPTION>Cartesian z coordinate, comoving.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="vx" datatype="float" unit="km/s" ucd=""><DESCRIPTION>x-component of velocity.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="vy" datatype="float" unit="km/s" ucd=""><DESCRIPTION>y-component of velocity.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="vz" datatype="float" unit="km/s" ucd=""><DESCRIPTION>z-component of velocity.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="Lx" datatype="float" unit="km/s" ucd=""><DESCRIPTION>x-component of angular momentum.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="Ly" datatype="float" unit="km/s" ucd=""><DESCRIPTION>y-component of angular momentum.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="Lz" datatype="float" unit="km/s" ucd=""><DESCRIPTION>z-component of angular momentum.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="spin" datatype="float" unit="" ucd=""><DESCRIPTION>Reduced spin parameter.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="FOFMass" datatype="float" unit="10^11Msun/h" ucd=""><DESCRIPTION>Friends-of-friends mass (number of particles in the FOF group times mass of a particle).</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="FOFRadius" datatype="float" unit="Mpc/h" ucd=""><DESCRIPTION>FOF radius defined as the distance from the center of mass of the halo to the farthest member particle.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="VirialMass" datatype="float" unit="10^11Msun/h" ucd=""><DESCRIPTION>Virial halo mass.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="VirialRadius" datatype="float" unit="Mpc/h" ucd=""><DESCRIPTION>Radius of the virialised region in the halo.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="VirialTemperature" datatype="float" unit="K" ucd=""><DESCRIPTION>Virial temperature of the halo.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="ColdGasMass" datatype="float" unit="10^11Msun/h" ucd=""><DESCRIPTION>Mass of cold gas in the halo (ISM + star).</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="HotGasMass" datatype="float" unit="10^11Msun/h" ucd=""><DESCRIPTION>Mass of hot gas in the halo.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="HotMetalMass" datatype="float" unit="10^11Msun/h" ucd=""><DESCRIPTION>Mass of metals in the hot gas component of the halo.</DESCRIPTION></FIELD>'
+    write(unit,'(a)') '<FIELD name="ColdMetalMass" datatype="float" unit="10^11Msun/h" ucd=""><DESCRIPTION>Mass of metals in the cold gas component of the halo.</DESCRIPTION></FIELD>'
+
+    return
+
+  end subroutine write_xml_header
+  
+  subroutine write_xml_footer(unit)
+    
+    implicit none
+    
+    integer(kind=4) :: unit
+    
+    write(unit,'(a)') '</TABLE>'
+    write(unit,'(a)') '</RESOURCE>'
+    write(unit,'(a)') '</VOTABLE>'
+    
+    return
+    
+  end subroutine write_xml_footer
+  
+end program halo_tables

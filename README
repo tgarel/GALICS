@@ -1,0 +1,14 @@
+
+- IDL Library
+==============
+
+In order to use the IDL routines, you need to add the following lines to
+your .bashrc file (or the equivalent for other shells) :
+
+export GALICS_PATH="~/Dev/GALICS/NewGalaxyMaker/"  # or whereever that is 
+export IDL_PATH="+${GALICS_PATH}/idl/:+your_libs:<IDL_DEFAULT>"
+
+you will also need the astron library installed. 
+
+
+

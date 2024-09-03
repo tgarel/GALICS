@@ -1,0 +1,5 @@
+Reddy et al.  2008;      UV RF LF z~ 2,3
+
+data: Groth-Westphal field,    GODDS-north fields.  3261 arcmin²
+
+filter : centered at 1700A.      ?????

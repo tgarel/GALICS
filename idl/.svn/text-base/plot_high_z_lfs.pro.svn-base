@@ -1,0 +1,431 @@
+pro plot_high_z_lfs;,run, nosubdir=nosubdir
+
+; z de gab04: z1,  z2,  z2_3,  z4,  z5_6                                      
+
+;;   window,retain=2
+;;   device,decomposed=0
+  loadct,39
+
+  run = {outputdir:' ',dirmin:0,dirmax:0,snapzdir:' ',name:' ',volumempc:0.0, hubble:0.0}
+  ;run.outputdir='/data/garel/GM-RUNS/512-100h-1Mpc-W3/sf_eff4_feed010/'
+  ;run.snapzdir='/data/garel/GM-RUNS/512-100h-1Mpc-W3/sf_eff4_feed010/1/'
+  ;run.outputdir='/data/garel/GM-RUNS/512-100h-1Mpc-W3/sf_eff4_feed010/'
+  ;run.snapzdir='/data/garel/GM-RUNS/512-100h-1Mpc-W3/sf_eff4_feed010/1/'
+  run.outputdir='/data/garel/GM-RUNS/512-100h-1Mpc/kenn_sfr/sf1_feedB002/'
+  run.snapzdir='/data/garel/GM-RUNS/512-100h-1Mpc/kenn_sfr/sf1_feedB002/1/'
+
+  run.dirmin=1
+  run.dirmax=15
+  run.name='kenn_sf1_feedB002/'
+
+  ;run.volumempc = 136.9863^3.    ; W3
+  ;run.hubble=0.730               ; W3
+  run.volumempc = 142.85714^3.    ; W1
+  run.hubble=0.700                ; W1
+
+
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+; z = 3
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  set_plot, 'ps'
+  device, filename='plotps_lfs/titi_iwa.ps',/color,bits_per_pixel=8
+
+
+z        = 3. 
+timestep = z2ts(z,run.snapzdir)
+if not keyword_set(nosubdir) then begin 
+   for i = run.dirmin,run.dirmax do begin 
+      outputdir= run.outputdir + strtrim(i,2) + '/'
+      if i eq run.dirmin then begin
+         read_gal_mags,outputdir,timestep,filters,mags,/total
+         read_gal_mags,outputdir,timestep,filters,magsne,/total,/noext
+         read_gal_results,outputdir,timestep,galres,grinfo
+      endif else begin 
+         read_gal_mags,outputdir,timestep,filters,magst,/total
+         mags = [mags,magst]
+         read_gal_mags,outputdir,timestep,filters,magstne,/total,/noext
+         magsne = [magsne,magstne]
+         read_gal_results,outputdir,timestep,galrest,grinfo
+         galres = [galres,galrest]
+      endelse
+   endfor
+endif else begin 
+   read_gal_mags,run.outputdir,timestep,filters,mags,/total
+   read_gal_mags,run.outputdir,timestep,filters,magsne,/total,/noext
+   read_gal_results,run.outputdir,timestep,galres,grinfo   
+endelse
+
+mini = -26
+maxi = -15
+nbins = 100
+
+min_mass = 8.
+max_mass = 12.
+;-------------------drory07 m_star data ---------------------------------
+;; mstar  = galres.disc_minstar + galres.bulge_minstar + galres.burst_minstar
+;; lmstar = alog10(mstar+1.e-5) + 11.0 ; in Msun 
+;; jeje_histo, lmstar, min_mass, max_mass, nbins, hmstar
+;; plot_io,hmstar.x,hmstar.dn/hmstar.dx/run.volumempc,psym=10,xtitle='Log!d10!n M!dstar!n [M!d!9n!n!3]', $  
+;;         ytitle='dN / dLog!d10!nM!dstar!n / Mpc!u3!n',charsize=1.5,xr=[8,12.5],/xs,yr=[1.e-6,0.1],/ys, title="Drory3-4"
+;; plot_obs_data,'Drory_Mstar_z2',run.hubble, symb=4
+
+
+;-------------------gab04 1500A filter-------------------------
+jeje_histo,mags.UV_1500A_Gab04,mini,maxi,nbins,h
+jeje_histo,magsne.UV_1500A_Gab04,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!d1500!n !6!sA!r!u!9 %!6!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='Gabz3 + reddy_z3'
+plot_obs_data,'gab04_1500_z3',run.hubble 
+plot_obs_data,'reddy08_1700A_z3',run.hubble,symb=4  
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;--------------------gab04 2800A filter-------------------------
+jeje_histo,mags.UV_2800A_Gab04,mini,maxi,nbins,h
+jeje_histo,magsne.UV_2800A_Gab04,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!d2800!n !6!sA!r!u!9 %!6!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='Gabz3'
+plot_obs_data,'gab04_2800_z3',run.hubble  
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;; ;-------------------gab04 SDSS_u filter-------------------------
+jeje_histo,mags.SDSS_u,mini,maxi,nbins,h
+jeje_histo,magsne.SDSS_u,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!du_sdss!n ',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='Gabz3'
+plot_obs_data,'gab04_u_z3',run.hubble 
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;; ;-------------------gab04 JOHNSON_B filter-------------------------
+jeje_histo,mags.JOHNSON_BAB,mini,maxi,nbins,h
+jeje_histo,magsne.JOHNSON_BAB,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!dB!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='Gabz3'
+plot_obs_data,'gab04_B_z3',run.hubble    
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;; ;-------------------gab04 SDSS_g filter-------------------------
+jeje_histo,mags.SDSS_g,mini,maxi,nbins,h
+jeje_histo,magsne.SDSS_g,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!dg_sdss!n ',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='Gabz3'
+plot_obs_data,'gab04_g_z3',run.hubble 
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+; z = 4
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+z        = 4
+timestep = z2ts(z,run.snapzdir)
+if not keyword_set(nosubdir) then begin 
+   for i = run.dirmin,run.dirmax do begin 
+      outputdir= run.outputdir + strtrim(i,2) + '/'
+      if i eq run.dirmin then begin
+         read_gal_mags,outputdir,timestep,filters,mags,/total
+         read_gal_mags,outputdir,timestep,filters,magsne,/total,/noext
+         read_gal_results,outputdir,timestep,galres,grinfo
+      endif else begin 
+         read_gal_mags,outputdir,timestep,filters,magst,/total
+         mags = [mags,magst]
+         read_gal_mags,outputdir,timestep,filters,magstne,/total,/noext
+         magsne = [magsne,magstne]
+         read_gal_results,outputdir,timestep,galrest,grinfo
+         galres = [galres,galrest]
+      endelse
+   endfor
+endif else begin 
+   read_gal_mags,run.outputdir,timestep,filters,mags,/total
+   read_gal_mags,run.outputdir,timestep,filters,magsne,/total,/noext
+   read_gal_results,run.outputdir,timestep,galres,grinfo
+endelse
+mini = -26
+maxi = -15
+nbins = 100
+
+min_mass = 8.
+max_mass = 12.
+;-------------------drory07 m_star data ---------------------------------
+mstar  = galres.disc_minstar + galres.bulge_minstar + galres.burst_minstar
+lmstar = alog10(mstar+1.e-5) + 11.0 ; in Msun 
+jeje_histo, lmstar, min_mass, max_mass, nbins, hmstar
+plot_io,hmstar.x,hmstar.dn/hmstar.dx/run.volumempc,psym=10,xtitle='Log!d10!n M!dstar!n [M!d!9n!n!3]', $  
+        ytitle='dN / dLog!d10!nM!dstar!n / Mpc!u3!n',charsize=1.5,xr=[8,12.5],/xs,yr=[1.e-6,0.1],/ys, title="Drory3-4"
+plot_obs_data,'Drory_Mstar_z3',run.hubble, symb=4
+
+;-------------------Bouwens07 i_775 filter pour z~4 (1600A) -----------------
+jeje_histo,mags.iwata07_1570A,mini,maxi,nbins,h
+jeje_histo,magsne.iwata07_1570A,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!d1600!n !6!sA!r!u!9 %!6!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='Bouz4'
+plot_obs_data,'bouwens07_1600A_z4',run.hubble,sym=5  
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+
+;-------------Gab04 2800 filter------------------------------------------------
+
+jeje_histo,mags.UV_2800A_Gab04,mini,maxi,nbins,h
+jeje_histo,magsne.UV_2800A_Gab04,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!d2800!n !6!sA!r!u!9 %!6!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='gab04_2800_z4'
+plot_obs_data,'gab04_2800_z4',run.hubble  ; Change z
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;-------------Gab04 1500 filter------------------------------------------------
+
+jeje_histo,mags.UV_2800A_Gab04,mini,maxi,nbins,h
+jeje_histo,magsne.UV_2800A_Gab04,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!d1500!n !6!sA!r!u!9 %!6!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='gab04_1500_z4'
+plot_obs_data,'gab04_1500_z4',run.hubble  ; Change z
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;-------------Gab04 u filter------------------------------------------------
+
+jeje_histo,mags.SDSS_u,mini,maxi,nbins,h
+jeje_histo,magsne.SDSS_u,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='U_sdss',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='gab04_u_z4'
+plot_obs_data,'gab04_u_z4',run.hubble  ; Change z
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;-------------Gab04 Johnson B filter------------------------------------------------
+
+jeje_histo,mags.JOHNSON_BAB,mini,maxi,nbins,h
+jeje_histo,magsne.JOHNSON_BAB,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='Johnson B',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='gab04_B_z4'
+plot_obs_data,'gab04_B_z4',run.hubble  ; Change z
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;-------------Gab04 g sdss filter----------------------------------------------
+jeje_histo,mags.SDSS_g,mini,maxi,nbins,h
+jeje_histo,magsne.SDSS_g,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='g_sdss',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='gab04_g_z4'
+plot_obs_data,'gab04_g_z4',run.hubble  ; Change z
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+; z = 5
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+z        = 5
+timestep = z2ts(z,run.snapzdir)
+if not keyword_set(nosubdir) then begin 
+   for i = run.dirmin,run.dirmax do begin 
+      outputdir= run.outputdir + strtrim(i,2) + '/'
+      if i eq run.dirmin then begin
+         read_gal_mags,outputdir,timestep,filters,mags,/total
+         read_gal_mags,outputdir,timestep,filters,magsne,/total,/noext
+         read_gal_results,outputdir,timestep,galres,grinfo
+      endif else begin 
+         read_gal_mags,outputdir,timestep,filters,magst,/total
+         mags = [mags,magst]
+         read_gal_mags,outputdir,timestep,filters,magstne,/total,/noext
+         magsne = [magsne,magstne]
+         read_gal_results,outputdir,timestep,galrest,grinfo
+         galres = [galres,galrest]
+      endelse
+   endfor
+endif else begin 
+   read_gal_mags,run.outputdir,timestep,filters,mags,/total
+   read_gal_mags,run.outputdir,timestep,filters,magsne,/total,/noext
+   read_gal_results,run.outputdir,timestep,galres,grinfo
+endelse
+mini = -26
+maxi = -15
+nbins = 100
+
+min_mass = 8.
+max_mass = 12.
+;-------------------drory07 m_star data ---------------------------------
+mstar  = galres.disc_minstar + galres.bulge_minstar + galres.burst_minstar
+lmstar = alog10(mstar+1.e-5) + 11.0 ; in Msun 
+jeje_histo, lmstar, min_mass, max_mass, nbins, hmstar
+plot_io,hmstar.x,hmstar.dn/hmstar.dx/run.volumempc,psym=10,xtitle='Log!d10!n M!dstar!n [M!d!9n!n!3]', $  
+        ytitle='dN / dLog!d10!nM!dstar!n / Mpc!u3!n',charsize=1.5,xr=[8,12.5],/xs,yr=[1.e-6,0.1],/ys, title="Drory4-5"
+plot_obs_data,'Drory_Mstar_z4',run.hubble, symb=4
+
+;-------------------bouwens07 i_850 filter pour z~5 et 6 (1600A) --------------
+;; jeje_histo,mags.UV_1500A_Gab04,mini,maxi,nbins,h
+;; jeje_histo,magsne.UV_1500A_Gab04,mini,maxi,nbins,hne
+;; plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!d1600!n !6!sA!r!u!9 %!6!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='Bouz5'
+;; plot_obs_data,'bouwens07_1600A_z5',run.hubble  ; Change z
+;; oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;---------iwata07 1570A filter pour z~5 ;  filtre pris arbitrairement --------
+jeje_histo,mags.iwata07_1570A,mini,maxi,nbins,h
+jeje_histo,magsne.iwata07_1570A,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!d1570!n !6!sA!r!u!9 %!6!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='Iwata_z5'
+plot_obs_data,'iwata_z5',run.hubble,symb=2  ; Change z
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+plot_obs_data,'mclure_z5',run.hubble,symb=4  ; Change z
+plot_obs_data,'bouwens07_1600A_z5',run.hubble,symb=5  ; Change z
+
+;laisser decommenté ci dessous -> z=5.5
+
+;---Mclure 1500A filter pour z~5 ; filtre pris arbitrairement (= Gabasch 1500 one --------
+;; jeje_histo,mags.UV_1500A_Gab04,mini,maxi,nbins,h
+;; jeje_histo,magsne.UV_1500A_Gab04,mini,maxi,nbins,hne
+;; plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!d1500!n !6!sA!r!u!9 %!6!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='Mclure_z5'
+;; plot_obs_data,'mclure_z5',run.hubble  ; Change z
+;; oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;-------------------reddy08 R_G_steidel filter pour z~2 (1700A) --------------
+;; jeje_histo,mags.,mini,maxi,nbins,h
+;; plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!d1700!n !6!sA!r!u!9 %!6!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3
+;; plot_obs_data,'eddy08_1700A_z2',run.hubble  
+
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+; z = 5.5
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+z        = 5.5
+timestep = z2ts(z,run.snapzdir)
+if not keyword_set(nosubdir) then begin 
+   for i = run.dirmin,run.dirmax do begin 
+      outputdir= run.outputdir + strtrim(i,2) + '/'
+      if i eq run.dirmin then begin
+         read_gal_mags,outputdir,timestep,filters,mags,/total
+         read_gal_mags,outputdir,timestep,filters,magsne,/total,/noext
+         read_gal_results,outputdir,timestep,galres,grinfo
+      endif else begin 
+         read_gal_mags,outputdir,timestep,filters,magst,/total
+         mags = [mags,magst]
+         read_gal_mags,outputdir,timestep,filters,magstne,/total,/noext
+         magsne = [magsne,magstne]
+         read_gal_results,outputdir,timestep,galrest,grinfo
+         galres = [galres,galrest]
+      endelse
+   endfor
+endif else begin 
+   read_gal_mags,run.outputdir,timestep,filters,mags,/total
+   read_gal_mags,run.outputdir,timestep,filters,magsne,/total,/noext
+   read_gal_results,run.outputdir,timestep,galres,grinfo
+endelse
+mini = -26
+maxi = -15
+nbins = 100
+
+;-------------Gab04 2800 filter------------------------------------------------
+
+jeje_histo,mags.UV_2800A_Gab04,mini,maxi,nbins,h
+jeje_histo,magsne.UV_2800A_Gab04,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!d2800!n !6!sA!r!u!9 %!6!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='gab04_2800_z5_6'
+plot_obs_data,'gab04_2800_z5_6',run.hubble  ; Change z
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;-------------Gab04 1500 filter------------------------------------------------
+
+jeje_histo,mags.UV_1500A_Gab04,mini,maxi,nbins,h
+jeje_histo,magsne.UV_1500A_Gab04,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!d1500!n !6!sA!r!u!9 %!6!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='gab04_1500_z5_6'
+plot_obs_data,'gab04_1500_z5_6',run.hubble  ; Change z
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;-------------Gab04 u filter------------------------------------------------
+
+jeje_histo,mags.SDSS_u,mini,maxi,nbins,h
+jeje_histo,magsne.SDSS_u,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='U_sdss',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='gab04_u_z5_6'
+plot_obs_data,'gab04_u_z5_6',run.hubble  ; Change z
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;-------------Gab04 Johnson B filter------------------------------------------------
+
+jeje_histo,mags.JOHNSON_BAB,mini,maxi,nbins,h
+jeje_histo,magsne.JOHNSON_BAB,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='Johnson B',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='gab04_B_z5_6'
+plot_obs_data,'gab04_B_z5_6',run.hubble  ; Change z
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;-------------Gab04 g sdss filter------------------------------------------------
+
+jeje_histo,mags.SDSS_g,mini,maxi,nbins,h
+jeje_histo,magsne.SDSS_g,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='g_sdss',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='gab04_g_z5_6'
+plot_obs_data,'gab04_g_z5_6',run.hubble  ; Change z
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+; z = 6
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+z        = 6
+timestep = z2ts(z,run.snapzdir)
+if not keyword_set(nosubdir) then begin 
+   for i = run.dirmin,run.dirmax do begin 
+      outputdir= run.outputdir + strtrim(i,2) + '/'
+      if i eq run.dirmin then begin
+         read_gal_mags,outputdir,timestep,filters,mags,/total
+         read_gal_mags,outputdir,timestep,filters,magsne,/total,/noext
+         read_gal_results,outputdir,timestep,galres,grinfo
+      endif else begin 
+         read_gal_mags,outputdir,timestep,filters,magst,/total
+         mags = [mags,magst]
+         read_gal_mags,outputdir,timestep,filters,magstne,/total,/noext
+         magsne = [magsne,magstne]
+         read_gal_results,outputdir,timestep,galrest,grinfo
+         galres = [galres,galrest]
+      endelse
+   endfor
+endif else begin 
+   read_gal_mags,run.outputdir,timestep,filters,mags,/total
+   read_gal_mags,run.outputdir,timestep,filters,magsne,/total,/noext
+   read_gal_results,run.outputdir,timestep,galres,grinfo
+endelse
+mini = -26
+maxi = -15
+nbins = 100
+
+;---Mclure 1500A filter pour z~6 ; filtre pris arbitrairement (= Gabasch 1500 one --------
+jeje_histo,mags.UV_1500A_Gab04,mini,maxi,nbins,h
+jeje_histo,magsne.UV_1500A_Gab04,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!d1500!n !6!sA!r!u!9 %!6!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='Mclure_z6'
+plot_obs_data,'mclure_z6',run.hubble  ; Change z
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+;----------------- Bouwens07 1600 A (changer filtre: mettre UV_1600A )-------------------------------------
+jeje_histo,mags.UV_1500A_Gab04,mini,maxi,nbins,h
+jeje_histo,magsne.UV_1500A_Gab04,mini,maxi,nbins,hne
+plot_io,h.x,h.dn/h.dx/run.volumempc,psym=10,xtitle='M!d1600!n !6!sA!r!u!9 %!6!n',ytitle='!4U!3 [Mpc!u-3!n mag!u-1!n]',charsize=1.5,xr=[-18,-24],/xs,yr=[1.e-5,1.e-2],/ys,thick=3,title='bouwens07_1600A_z6'
+plot_obs_data,'bouwens07_1600A_z6',run.hubble  ; Change z
+oplot,hne.x,hne.dn/hne.dx/run.volumempc,psym=10,linestyle=2,thick=3
+
+
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++
+;           Infrared galaxies  High redshift univer
+;                       z = 3.0
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++
+; define z=3.00 snapshot
+;; z        = 3.0
+;; timestep = z2ts(z,run.snapzdir)
+;; ; read useful information 
+;; if not keyword_set(nosubdir) then begin 
+;;    for i = run.dirmin,run.dirmax do begin 
+;;       outputdir= run.outputdir + strtrim(i,2) + '/'
+;;       if i eq run.dirmin then begin
+;;          read_bol_lum,outputdir,timestep,bol
+;;          read_gal_mags,outputdir,timestep,filters,mags,/total
+;;       endif else begin 
+;;          read_bol_lum,outputdir,timestep,bolt
+;;          bol = [bol,bolt]
+;;          read_gal_mags,outputdir,timestep,filters,magst,/total
+;;          mags = [mags,magst]
+;;       endelse
+;;    endfor
+;; endif else begin 
+;;    read_bol_lum,run.outputdir,timestep,bol
+;;    read_gal_mags,run.outputdir,timestep,filters,mags,/total   
+;; endelse
+
+
+; ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+; IV.1   IR bolometric luminosities 
+; ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+;; irbol = bol.ir*(run.hubble^2)
+;; lirbol = alog10(irbol)
+;; jeje_histo,  lirbol, 7.0, 14.0, 100, hirbol
+;; plot_io,hirbol.x,hirbol.dn/hirbol.dx/(run.volumempc*run.hubble^3.0),psym=10,xtitle='Log!d10!n L!dir!n [h!u-2!n L!d!9n!n!3]', $  
+;;         ytitle='dN / dLog!d10!nL!dir!n / Mpc!u3!nh!u-3!n',charsize=1.5,xr=[8,12.5],/xs,yr=[1.e-6,1.0],/ys
+
+ device,/close
+
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+; IV.2 Set of infrared filters
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ir_lfs,mags,run.volumempc*(run.hubble^3),run.hubble,z, no_obs_data=no_obs_data
+
+
+
+
+
+end
+

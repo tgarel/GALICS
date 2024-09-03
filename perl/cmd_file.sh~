@@ -1,0 +1,2 @@
+cd /simu3/garel/GM-RUNS/1024-100h-1Mpc-W5/NewSimu_z0/sf5_zmigr_z0_article2_MOMAF_newFilters2_galorder//1  &&  ./GM1 ./ > /simu3/garel/GM-RUNS/1024-100h-1Mpc-W5/NewSimu_z0/sf5_zmigr_z0_article2_MOMAF_newFilters2_galorder//1/log.out  
+cd /simu3/garel/GM-RUNS/1024-100h-1Mpc-W5/NewSimu_z0/sf5_zmigr_z0_article2_MOMAF_newFilters2_galorder//2  &&  ./GM2 ./ > /simu3/garel/GM-RUNS/1024-100h-1Mpc-W5/NewSimu_z0/sf5_zmigr_z0_article2_MOMAF_newFilters2_galorder//2/log.out  

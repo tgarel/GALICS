@@ -1,0 +1,13 @@
+# Parameters for code build_db_tables.f90
+# 
+
+gmdir = /data/blaizot/GM-RUNS/256-100h-1Mpc/RUN_DB/
+
+halotables   = .false.
+halomomaf    = .true.
+galaxytables = .false.
+galaxymomaf  = .false.
+
+nsteps       = 73
+nsubdirs     = 24
+

@@ -1,0 +1,71 @@
+pro jj
+
+snapzdir = '/simu1/data2/garel/GM-RUNS/1024-100h-1Mpc-W3/kenn_sfr/sf20_fd025_wind_corr/1/'
+  ;snapzdir = '/data/garel/GM-RUNS/512-100h-1Mpc-W3/kenn_sfr/sf20_feedB002_best3/1/'
+  timestep = z2ts(z,snapzdir)
+
+;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+  for i=1L,111L do begin
+
+     outputdir='/simu1/data2/garel/GM-RUNS/1024-100h-1Mpc-W3/kenn_sfr/sf20_fd025_wind_corr/'+strtrim(i,2)+'/'     
+
+     if i eq 1 then begin
+        read_gal_results,outputdir,timestep,S
+        read_gal_sfr,outputdir,timestep,a
+        read_gal_nphot,outputdir,timestep,n
+        read_gal_uv1200,outputdir,timestep,uv
+        read_gal_uv1200_ext,outputdir,timestep,e
+     endif else begin
+        read_gal_results,outputdir,timestep,S2
+        read_gal_sfr,outputdir,timestep,a2
+        read_gal_nphot,outputdir,timestep,n2
+        read_gal_uv1200,outputdir,timestep,uv2
+        read_gal_uv1200_ext,outputdir,timestep,e2
+        S=[S,S2]
+        a=[a,a2]
+        n   = [n,n2]
+        uv  = [uv,uv2]
+        e   = [e,e2]
+
+     endelse
+     checkbox++
+  endfor
+
+  mvir_gal     = S.mvir
+  mfof_gal     = S.mfof
+  rvir_gal     = S.rvir
+
+;;   mass_GU      = (S.bulge_mgal + S.burst_mgal + S.disc_mgal)
+;;   mass         = (S.bulge_mgal + S.burst_mgal + S.disc_mgal) * 1d11 * msun 
+                                ; en kg
+
+  r            = (S.disc_rgal) * 1d6 * 3.08568025 * 1d16   ; en m
+  r_GU         = (S.disc_rgal) 
+
+  ;r            = rweighted                                            ; en m
+  ;r_GU         = rweighted_GU
+
+  mcold        = (S.bulge_mcold + S.burst_mcold + S.disc_mcold) * 1d11 * msun            ; en kg
+  mcold_GU     = (S.bulge_mcold + S.burst_mcold + S.disc_mcold)
+
+  mcoldz       = (S.bulge_mcoldz + S.burst_mcoldz + S.disc_mcoldz) * 1d11 * msun         ; en kg 
+
+  sfr          = a.disc_sfr10 + a.bulge_sfr10 + a.burst_sfr10                            ; Msun / yr
+
+  ms           = (S.bulge_minstar + S.burst_minstar + S.disc_minstar) * 1d11 * msun               ; en kg
+  ms_GU        = S.bulge_minstar + S.burst_minstar + S.disc_minstar
+
+  mass_GU      = ms_GU  ;+ mvir_gal * r / rvir_gal  ;/ 2.
+  mass         = ms  ;+ mvir_gal * r / rvir_gal * 1d11 * msun;/ 2.
+
+  Nphot        = n.disc_N + n.bulge_N + n.burst_N
+
+  existing_gal = where(mvir_gal ne 0.0d0 and mfof_gal ne 0.0d0 and rvir_gal ne 0.0d0 and mass ne 0.0d0 and r ne 0.0d0 and  mcold ne 0.0d0,ng)
+
+
+
+
+
+
+end

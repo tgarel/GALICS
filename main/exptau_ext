@@ -1,0 +1,6 @@
+
+
+	nh_tibo	 = gal%mcold / 4.0d0 / pi / mu / mh / gal%disc_rgal**2
+	nh_tibo = log10(nh_tibo) + 18.95d0  
+	tau_tibo = 10**(tau_hires(:,1) + nh_tibo + tau_hires(:,2)*Z_g)
+	 	

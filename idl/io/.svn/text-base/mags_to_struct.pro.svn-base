@@ -1,0 +1,53 @@
+pro mags_to_struct, filters, discmags, bulgemags, burstmags, mags, total=total
+  
+  nfilters = n_elements(filters)
+  if keyword_set(total) then begin 
+     mags = create_struct(filters(0),0.0, $
+                          'disc_'+strtrim(filters(0),2),0.0,  $
+                          'bulge_'+strtrim(filters(0),2),0.0, $
+                          'burst_'+strtrim(filters(0),2),0.0) 
+     for ifilt = 1,nfilters-1 do begin 
+        mags = create_struct(mags, $
+                             strtrim(filters(ifilt),2),0.0,          $
+                             'disc_'+strtrim(filters(ifilt),2),0.0,  $
+                             'bulge_'+strtrim(filters(ifilt),2),0.0, $
+                             'burst_'+strtrim(filters(ifilt),2),0.0)
+     endfor
+  endif else begin 
+     mags = create_struct('disc_'+strtrim(filters(0),2),0.0,  $
+                          'bulge_'+strtrim(filters(0),2),0.0, $
+                          'burst_'+strtrim(filters(0),2),0.0)
+     for ifilt = 1,nfilters-1 do begin 
+        mags = create_struct(mags, $
+                             'disc_'+strtrim(filters(ifilt),2),0.0,  $
+                             'bulge_'+strtrim(filters(ifilt),2),0.0, $
+                             'burst_'+strtrim(filters(ifilt),2),0.0) 
+     endfor
+  endelse
+
+  ngals = n_elements(discmags(0,*))
+  mags  = replicate(mags,ngals)
+
+  if keyword_set(total) then begin 
+     for ifilt = 0,nfilters-1 do begin 
+        ld = ( lb = ( ls = dblarr(ngals)))
+        ii = where(discmags(ifilt,*) lt 90.,ni)  & if ni ne 0 then ld(ii) = 10.d0^(-0.4d0*discmags(ifilt,ii))
+        ii = where(bulgemags(ifilt,*) lt 90.,ni) & if ni ne 0 then lb(ii) = 10.d0^(-0.4d0*bulgemags(ifilt,ii))
+        ii = where(burstmags(ifilt,*) lt 90.,ni) & if ni ne 0 then ls(ii) = 10.d0^(-0.4d0*burstmags(ifilt,ii))
+        ld = ld + lb + ls
+        
+        mags(*).(4*ifilt)   = 99.
+        ii = where(ld gt 0.0,ni) & if ni ne 0 then mags(ii).(4*ifilt) = -2.5d0 * alog10(ld(ii))
+        mags(*).(4*ifilt+1) = reform(discmags(ifilt,*))
+        mags(*).(4*ifilt+2) = reform(bulgemags(ifilt,*))
+        mags(*).(4*ifilt+3) = reform(burstmags(ifilt,*))
+     endfor
+  endif else begin 
+     for ifilt = 0,nfilters-1 do begin 
+        mags(*).(3*ifilt) = reform(discmags(ifilt,*))
+        mags(*).(3*ifilt+1) = reform(bulgemags(ifilt,*))
+        mags(*).(3*ifilt+2) = reform(burstmags(ifilt,*))
+     endfor
+  endelse
+
+end

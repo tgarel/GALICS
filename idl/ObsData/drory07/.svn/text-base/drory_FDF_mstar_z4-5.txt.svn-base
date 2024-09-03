@@ -1,0 +1,12 @@
+5	4
+9.50	-2.771 -2.697 -2.859 
+10.00	-3.007 -2.918 -3.095 
+10.50	-3.376 -3.243 -3.450
+11.00	-3.701 -3.523 -3.892
+11.50	-4.749 -3.966 -5.369
+
+# Drory 05 FDF data,  4.00<z<5.00 Mstar 
+# Column 1 log10 M_star
+# Column 2 log10 Phi = log10 dN/dM_star (Mpc^-3 dex^-1)
+# Column 2 log10 Phi_up
+# Column 2 log10 Phi_down 

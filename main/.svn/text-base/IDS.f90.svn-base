@@ -1,0 +1,486 @@
+module IDS
+
+#ifdef DEFINE_IDS
+  use UTILS_BARYONS
+  
+  public
+
+  type galaxy_tree
+     integer(kind=4)           :: hno,gno         ! me
+     integer(kind=4)           :: dhno, dgno      ! my daughter
+     integer(kind=8)           :: GalaxyID,BushID,TreeID,HaloID
+     integer(kind=8)           :: FirstProgenitorID,NextProgenitorID,LastProgenitorID,DescendantID
+  end type galaxy_tree
+
+  type timestep
+     integer(kind=4)           :: ng
+     type(galaxy_tree),pointer :: gal(:)
+  end type timestep
+  type(timestep),allocatable   :: tmst(:)
+
+  integer(kind=4)              :: progcnt
+
+  type halo_tree
+     integer(kind=8)           :: TreeID
+     integer(kind=8)           :: FirstProgenitorID,NextProgenitorID,LastProgenitorID,DescendantID
+  end type halo_tree
+  
+  type htimestep
+     type(halo_tree),pointer   :: h(:)
+  end type htimestep
+  type(htimestep),allocatable   :: hst(:)
+
+contains
+
+!/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+!******************************************************************************************************************
+  subroutine define_haloids
+
+    ! same idea as for galaxies (below) but here we want to keep info on two trees : the simlpe one and the complex one...
+
+    implicit none
+    
+    integer(kind=4)             :: ts,ih,nh,bush,tree
+    integer(kind=4),allocatable :: BushTreeCnt(:)
+    integer(kind=4)             :: minBushID,maxBushID,NBushes  
+    integer(kind=8)             :: offset 
+
+!!$    if (nsteps .ne. nsteps_do) then 
+!!$       write(errunit,'(a)') '> Error in define_haloids : need nsteps_do == nsteps to define HaloIDs properly... '
+!!$       ! NB : this is not true :) But for now, let's assume it is... (if you change this, change define_galaxyids too...)
+!!$       stop
+!!$    end if
+
+    call init_halo_tree
+
+    ! walk the trees and define relative IDs (per tree)
+    ! jeje
+!!$    minBushID   = minval(tsno(nsteps)%liste_halos(:)%BushID)
+!!$    maxBushID   = maxval(tsno(nsteps)%liste_halos(:)%BushID)
+    minBushID   = minval(tsno(nsteps_do)%liste_halos(:)%BushID)
+    maxBushID   = maxval(tsno(nsteps_do)%liste_halos(:)%BushID)
+    ! ejej
+    NBushes     = maxBushID - minBushID + 1
+    allocate(BushTreeCnt(NBushes))
+    BushTreeCnt = 0
+    ! jeje 
+!!$    do ts = nsteps,1,-1 
+    do ts = nsteps_do,1,-1
+    !ejej
+       nh = tsno(ts)%nb_of_halos
+       do ih = 1,nh 
+          bush = tsno(ts)%liste_halos(ih)%BushID - minBushID + 1
+          tree = BushTreeCnt(bush)
+          if (hst(ts)%h(ih)%TreeID == -1) then  ! if halo tree has not already been scanned, do it.             
+             progcnt = 0                        ! initialize haloid counted for current (simple) tree
+             call get_my_halo_stree(tree,ts,ih)
+             BushTreeCnt(bush) = tree + 1  ! update number of halo trees in bush
+          end if
+       end do
+    end do
+
+    ! add offsets so that each ID is unique within the whole simulation
+    ! NB: don't add offset to -1 values, as -1 means something ...
+    if (maxval(BushTreeCnt) > 100000) then 
+       write(errunit,'(a)') '> Too many trees in a bush : increase 100000 offset in IDS:define_haloids'
+       stop
+    end if
+    ! jeje
+!!$    if (maxval(hst(nsteps)%h(:)%LastProgenitorID) > 1000000) then 
+!!$       write(errunit,'(a)') '> Too many galaxies in tree : increase 1000000 offset in IDS:define_haloids'
+!!$       stop
+!!$    end if
+    if (maxval(hst(nsteps_do)%h(:)%LastProgenitorID) > 1000000) then 
+       write(errunit,'(a)') '> Too many galaxies in tree : increase 1000000 offset in IDS:define_haloids'
+       stop
+    end if
+    ! ejej
+
+    ! jeje
+!!$    do ts = 1,nsteps
+    do ts = 1, nsteps_do
+    ! ejej
+       do ih = 1,tsno(ts)%nb_of_halos
+          hst(ts)%h(ih)%TreeID            = hst(ts)%h(ih)%TreeID + int(tsno(ts)%liste_halos(ih)%BushID,8) * 100000
+          offset = hst(ts)%h(ih)%TreeID * 1000000
+          if (tsno(ts)%liste_halos(ih)%HaloID == -1) then 
+             write(errunit,*) 'non-IDed halo in define_haloids... '
+             stop
+          end if
+          tsno(ts)%liste_halos(ih)%HaloID       = tsno(ts)%liste_halos(ih)%HaloID + offset
+          if (hst(ts)%h(ih)%FirstProgenitorID .ne. -1) &
+               hst(ts)%h(ih)%FirstProgenitorID  = hst(ts)%h(ih)%FirstProgenitorID + offset
+          if (hst(ts)%h(ih)%NextProgenitorID .ne. -1)  &
+               hst(ts)%h(ih)%NextProgenitorID   = hst(ts)%h(ih)%NextProgenitorID  + offset
+          if (hst(ts)%h(ih)%LastProgenitorID .ne. -1)  &
+               hst(ts)%h(ih)%LastProgenitorID   = hst(ts)%h(ih)%LastProgenitorID  + offset
+          if (hst(ts)%h(ih)%DescendantID .ne. -1)      &
+               hst(ts)%h(ih)%DescendantID       = hst(ts)%h(ih)%DescendantID      + offset
+       end do
+    end do
+
+    ! output this (in a way that matches the other outputs) 
+    call output_haloids
+
+    call clear_halo_tree
+
+    return
+
+  end subroutine define_haloids
+
+!******************************************************************************************************************
+  subroutine init_halo_tree
+
+    implicit none 
+
+    integer(kind=4)             :: ts,ih,nh
+    
+    ! jeje 
+!!$    allocate(hst(nsteps))
+    allocate(hst(nsteps_do))
+    ! ejej
+
+    ! jeje 
+!!$    do ts = 1,nsteps 
+    do ts = 1,nsteps_do
+    ! ejej
+       nh = tsno(ts)%nb_of_halos
+       allocate(hst(ts)%h(nh))
+       do ih = 1, nh
+          hst(ts)%h(ih)%TreeID            = -1
+          hst(ts)%h(ih)%FirstProgenitorID = -1
+          hst(ts)%h(ih)%NextProgenitorID  = -1
+          hst(ts)%h(ih)%LastProgenitorID  = -1
+          hst(ts)%h(ih)%DescendantID      = -1
+       end do
+    end do
+
+    return
+
+  end subroutine init_halo_tree
+
+!******************************************************************************************************************
+  recursive subroutine get_my_halo_stree(tree,ts,ihalo)
+
+    ! scan the tree in a depth-first fashion to assign relative HaloIDs
+    ! Define FirstProg and NextProg on the fly
+
+    implicit none
+
+    integer(kind=4) :: tree,ts,ihalo
+    integer(kind=4) :: ip,phno,tsminus1
+    integer(kind=4) :: prevprog
+
+    prevprog = -1
+
+    tsno(ts)%liste_halos(ihalo)%HaloID = progcnt
+    hst(ts)%h(ihalo)%TreeID            = tree
+
+    do ip = 1, tsno(ts)%liste_halos(ihalo)%tree%ndads
+       tsminus1 = ts -1
+       progcnt  = progcnt + 1
+       phno = tsno(ts)%liste_halos(ihalo)%tree%dads(ip)
+#ifdef RENUMBERING
+       call renumbering(phno,tsminus1)
+#endif
+       hst(tsminus1)%h(phno)%DescendantID = tsno(ts)%liste_halos(ihalo)%HaloID
+       if (ip == 1) then  
+          hst(ts)%h(ihalo)%FirstProgenitorID = progcnt
+          prevprog = phno
+       else
+          hst(tsminus1)%h(prevprog)%NextProgenitorID = progcnt
+          prevprog = phno
+       end if
+       call get_my_halo_stree(tree,tsminus1,phno)                
+       hst(tsminus1)%h(phno)%LastProgenitorID = progcnt
+    end do
+
+    return
+
+  end subroutine get_my_halo_stree
+
+!******************************************************************************************************************
+  subroutine output_haloids
+
+    implicit none
+
+    integer(kind=4)         :: ts,ih,unit
+    character(MAXPATHSIZE)  :: filename
+    
+    unit = 12
+    ! jeje 
+!!$    do ts = 1,nsteps
+    do ts = 1, nsteps_do
+    ! ejej
+       write(filename,'(a,a,i3.3)') trim(data_dir),'/HaloIDs.',ts
+       open(unit=unit,file=filename,status='unknown',form='formatted')
+       write(unit,*) tsno(ts)%nb_of_halos
+       do ih = 1,tsno(ts)%nb_of_halos
+          write(unit,'(7(i17,1x))') tsno(ts)%liste_halos(ih)%BushID , &
+               hst(ts)%h(ih)%TreeID , &
+               tsno(ts)%liste_halos(ih)%HaloID , &
+               hst(ts)%h(ih)%DescendantID , &
+               hst(ts)%h(ih)%FirstProgenitorID , &
+               hst(ts)%h(ih)%NextProgenitorID , &
+               hst(ts)%h(ih)%LastProgenitorID
+       end do
+       close(unit)
+    end do
+
+    return
+    
+  end subroutine output_haloids
+
+!******************************************************************************************************************
+  subroutine clear_halo_tree
+
+    implicit none
+
+    integer(kind=4) :: ts
+    
+    do ts = 1,nsteps_do !! jeje : nsteps -> nsteps_do
+       deallocate(hst(ts)%h)
+    end do
+    deallocate(hst)
+
+    return
+
+  end subroutine clear_halo_tree
+
+!******************************************************************************************************************
+  subroutine define_galids
+
+    ! routine which defines galaxy-tree links in plenty of nice ways, as for the Mill. simulation
+    
+    implicit none
+    
+    integer(kind=4)             :: ts,ig,bush,tree
+    integer(kind=4),allocatable :: BushTreeCnt(:)
+    integer(kind=4)             :: minBushID,maxBushID,NBushes  
+    integer(kind=8)             :: offset
+#ifdef MOMAF_INPUTS
+    integer(kind=8),allocatable :: galid(:),haloid(:)
+    character(MAXPATHSIZE)      :: filename 
+#endif
+
+    write(errunit,'(a)') '> Almost done : sorting out IDs... '
+
+    ! read numbers, daughters, and BushIDs
+    call read_galaxy_tree
+    
+    ! walk the trees and define relative IDs (per tree)
+    minBushID   = minval(tmst(nsteps_do)%gal(:)%BushID)   !! jeje : nsteps -> nsteps_do
+    maxBushID   = maxval(tmst(nsteps_do)%gal(:)%BushID)   !! jeje : nsteps -> nsteps_do
+    NBushes     = maxBushID - minBushID + 1
+    allocate(BushTreeCnt(NBushes))
+    BushTreeCnt = 0
+    do ts = nsteps_do,1,-1   !! jeje : nsteps -> nsteps_do
+       do ig = 1,tmst(ts)%ng
+          bush = tmst(ts)%gal(ig)%BushID - minBushID + 1
+          tree = BushTreeCnt(bush)
+          if (tmst(ts)%gal(ig)%TreeID == -1) then  ! if galaxy tree has not already been scanned, do it.             
+             progcnt = 0       ! initialize galid counted for current tree
+             call get_my_tree(tree,ts,tmst(ts)%gal(ig)%hno,tmst(ts)%gal(ig)%gno,ig)
+             tmst(ts)%gal(ig)%LastProgenitorID = progcnt
+             BushTreeCnt(bush) = tree + 1  ! update number of galaxy trees in bush
+          end if
+       end do
+    end do
+
+    ! add offsets so that each ID is unique within the whole simulation
+    ! NB: don't add offset to -1 values, as -1 means something ...
+    if (maxval(BushTreeCnt) > 100000) then 
+       write(errunit,'(a)') '> Too many trees in a bush : increase 100000 offset in IDS:define_galids'
+       stop
+    end if
+    if (maxval(tmst(nsteps_do)%gal(:)%LastProgenitorID) > 1000000) then  !! jeje : nsteps -> nsteps_do
+       write(errunit,'(a)') '> Too many galaxies in tree : increase 1000000 offset in IDS:define_galids'
+       stop
+    end if
+    do ts = 1,nsteps_do !! jeje : nsteps -> nsteps_do
+       do ig = 1,tmst(ts)%ng
+          tmst(ts)%gal(ig)%TreeID            = tmst(ts)%gal(ig)%TreeID + tmst(ts)%gal(ig)%BushID * 100000
+          offset = tmst(ts)%gal(ig)%TreeID * 1000000
+          if (tmst(ts)%gal(ig)%GalaxyID == -1) then 
+             write(errunit,*) 'non-IDed galaxy in define_galids... '
+             stop
+          end if
+          tmst(ts)%gal(ig)%GalaxyID          = tmst(ts)%gal(ig)%GalaxyID          + offset
+          if (tmst(ts)%gal(ig)%FirstProgenitorID .ne. -1) &
+               tmst(ts)%gal(ig)%FirstProgenitorID = tmst(ts)%gal(ig)%FirstProgenitorID + offset
+          if (tmst(ts)%gal(ig)%NextProgenitorID .ne. -1)  &
+               tmst(ts)%gal(ig)%NextProgenitorID  = tmst(ts)%gal(ig)%NextProgenitorID  + offset
+          if (tmst(ts)%gal(ig)%LastProgenitorID .ne. -1)  &
+               tmst(ts)%gal(ig)%LastProgenitorID  = tmst(ts)%gal(ig)%LastProgenitorID  + offset
+          if (tmst(ts)%gal(ig)%DescendantID .ne. -1)      &
+               tmst(ts)%gal(ig)%DescendantID      = tmst(ts)%gal(ig)%DescendantID      + offset
+       end do
+    end do
+
+    ! output this (in a way that matches the other outputs) 
+    call output_galids
+
+#ifdef MOMAF_INPUTS
+    ! update fake IDs written in momaf inputs
+    do ts = 1,nsteps_do !! jeje : nsteps -> nsteps_do
+       allocate(galid(tmst(ts)%ng),haloid(tmst(ts)%ng))
+       do ig = 1,tmst(ts)%ng
+          galid(ig)  = tmst(ts)%gal(ig)%GalaxyID
+          haloid(ig) = tmst(ts)%gal(ig)%HaloID
+       end do
+       write(filename,'(a,a,i3.3)') trim(momaf_snap_dir),'/IDsPosVel.',ts
+       filename = trim(filename)//char(0)
+       call update_momaf_with_ids(filename,galid,haloid)
+       deallocate(galid,haloid)
+    end do
+#endif
+
+    return
+
+  end subroutine define_galids
+
+!******************************************************************************************************************
+
+  subroutine read_galaxy_tree
+    
+    implicit none
+    
+    character(MAXPATHSIZE)  :: filename
+    integer(kind=4)         :: dum,ng,ts,ig
+
+    ! read bookkeep.dat to allocate timestep structure
+    write(filename,'(a,a)') trim(data_dir),'/bookkeep.dat'
+    open(unit=12,file=filename,form="formatted",status="unknown")
+    read(12,*) nsteps
+    allocate(tmst(nsteps_do)) !! jeje : nsteps -> nsteps_do
+    do ts = 1,nsteps_do       !! jeje : nsteps -> nsteps_do
+       read(12,*) dum,ng
+       tmst(ts)%ng = ng
+       allocate(tmst(ts)%gal(ng))
+       do ig = 1,ng
+          tmst(ts)%gal(ig)%hno               = -1
+          tmst(ts)%gal(ig)%gno               = -1
+          tmst(ts)%gal(ig)%dhno              = -1
+          tmst(ts)%gal(ig)%dgno              = -1
+          tmst(ts)%gal(ig)%GalaxyID          = -1
+          tmst(ts)%gal(ig)%BushID            = -1
+          tmst(ts)%gal(ig)%TreeID            = -1
+          tmst(ts)%gal(ig)%HaloID            = -1
+          tmst(ts)%gal(ig)%FirstProgenitorID = -1
+          tmst(ts)%gal(ig)%NextProgenitorID  = -1
+          tmst(ts)%gal(ig)%LastProgenitorID  = -1
+          tmst(ts)%gal(ig)%DescendantID      = -1
+       end do
+    end do
+    close(12)
+
+    ! read gal_daughters, BushIDs, and numbers of all timesteps to fill in tmst
+    do ts = 1,nsteps_do - 1 !! jeje : nsteps -> nsteps_do
+       write(filename,'(a,a,i3.3)') trim(data_dir),'/gal_daughters.',ts
+       open(unit=12,file=filename,form="formatted",status="old")
+       write(filename,'(a,a,i3.3)') trim(data_dir),'/numbers.',ts
+       open(unit=13,file=filename,form="formatted",status="old")
+       write(filename,'(a,a,i3.3)') trim(data_dir),'/GalaxyIDs.',ts
+       open(unit=14,file=filename,form="formatted",status="old")
+       do ig = 1,tmst(ts)%ng
+          read(12,*) tmst(ts)%gal(ig)%dhno,tmst(ts)%gal(ig)%dgno
+          read(13,*) dum,tmst(ts)%gal(ig)%hno,tmst(ts)%gal(ig)%gno
+!          read(14,'(i8,1x,i16)') tmst(ts)%gal(ig)%BushID,tmst(ts)%gal(ig)%HaloID
+          read(14,*) tmst(ts)%gal(ig)%BushID,tmst(ts)%gal(ig)%HaloID
+       end do
+       close(12) ; close(13) ; close(14)
+    end do
+    ! no daughters for last timestep
+    ts = nsteps_do !! jeje : nsteps -> nsteps_do
+    write(filename,'(a,a,i3.3)') trim(data_dir),'/numbers.',ts
+    open(unit=13,file=filename,form="formatted",status="old")
+    write(filename,'(a,a,i3.3)') trim(data_dir),'/GalaxyIDs.',ts
+    open(unit=14,file=filename,form="formatted",status="old")
+    do ig = 1,tmst(ts)%ng
+       read(13,*) dum,tmst(ts)%gal(ig)%hno,tmst(ts)%gal(ig)%gno
+!       read(14,'(i8,1x,i16)') tmst(ts)%gal(ig)%BushID,tmst(ts)%gal(ig)%HaloID
+       read(14,*) tmst(ts)%gal(ig)%BushID,tmst(ts)%gal(ig)%HaloID
+    end do
+    close(13) ; close(14)
+ 
+    return 
+    
+  end subroutine read_galaxy_tree
+
+!******************************************************************************************************************
+
+  subroutine output_galids
+
+    implicit none
+
+    integer(kind=4)         :: ts,ig,unit
+    character(MAXPATHSIZE)  :: filename
+    
+    unit = 12
+    do ts = 1,nsteps_do !! jeje : nsteps -> nsteps_do
+       write(filename,'(a,a,i3.3)') trim(data_dir),'/GalaxyIDs.',ts
+       open(unit=unit,file=filename,status='unknown',form='formatted')
+       write(unit,*) tmst(ts)%ng
+       do ig = 1,tmst(ts)%ng
+          write(unit,'(8(i17,1x))') tmst(ts)%gal(ig)%BushID , &
+!          write(unit,*) tmst(ts)%gal(ig)%BushID , &
+               tmst(ts)%gal(ig)%TreeID , &
+               tmst(ts)%gal(ig)%GalaxyID , &
+               tmst(ts)%gal(ig)%DescendantID , &
+               tmst(ts)%gal(ig)%FirstProgenitorID , &
+               tmst(ts)%gal(ig)%NextProgenitorID , &
+               tmst(ts)%gal(ig)%LastProgenitorID, &
+               tmst(ts)%gal(ig)%HaloID 
+       end do
+       close(unit)
+    end do
+
+    return
+    
+  end subroutine output_galids
+
+!******************************************************************************************************************
+  
+  recursive subroutine get_my_tree(tree,ts,hno,gno,igal)
+
+    ! scan the tree in a depth-first fashion to assign relative GalaxyIDs
+    ! Define FirstProg and NextProg on the fly
+
+    implicit none
+
+    integer(kind=4) :: tree,ts,hno,gno,igal
+    integer(kind=4) :: tsminus1,ig
+    integer(kind=4) :: prevprog
+
+    tmst(ts)%gal(igal)%GalaxyID  = progcnt
+    tmst(ts)%gal(igal)%TreeID    = tree
+    
+    tsminus1 = ts - 1
+    if (tsminus1 > 0) then 
+       prevprog = -1
+       do ig = 1,tmst(tsminus1)%ng
+          if (tmst(tsminus1)%gal(ig)%dhno == hno .and. tmst(tsminus1)%gal(ig)%dgno == gno) then 
+             progcnt = progcnt + 1
+             tmst(tsminus1)%gal(ig)%DescendantID = tmst(ts)%gal(igal)%GalaxyID
+             if (prevprog == -1) then 
+                prevprog = ig
+                tmst(ts)%gal(igal)%FirstProgenitorID = progcnt
+             else
+                tmst(tsminus1)%gal(prevprog)%NextProgenitorID = progcnt
+                prevprog = ig
+             end if
+             call get_my_tree(tree,tsminus1,tmst(tsminus1)%gal(ig)%hno,tmst(tsminus1)%gal(ig)%gno,ig)                
+             tmst(tsminus1)%gal(ig)%LastProgenitorID = progcnt
+          end if
+       end do
+    end if
+
+    return
+
+  end subroutine get_my_tree
+
+!******************************************************************************************************************
+!/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#endif
+end module IDS
+

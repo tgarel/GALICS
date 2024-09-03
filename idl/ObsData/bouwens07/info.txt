@@ -1,0 +1,7 @@
+Bouwens07: "UV LF at z~4,5,6..."
+
+data: ACS HUDF, HUDF-Ps, GOODS.
+
+Selection criteria: B, V, i dropouts for  z ~ 4, 5, 6
+
+RF filter: centered at 1600A. (i_775 pour z4, z850 pour z~5,6)

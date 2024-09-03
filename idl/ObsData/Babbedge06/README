@@ -1,0 +1,40 @@
+I attach an ascii file (for each band) output from the plotting code that details the datapoints.  For completeness I've also included the breakdown 
+into 'all (galaxy)', 'early-type', 'late-type' and 'starburst' as is shown (for 3.6 and 24 micron) in Fig. 9.  You probably just want the galaxy LF 
+data (as in Fig. 8) but the breakdown may be of interest if you're looking at environments (ie. expect more early-type in clusters etc).  Apologies 
+for the slightly unfriendly format! 
+
+[aside - I haven't included the quasar/AGN LFs here]
+
+Looking at the left column if Fig 9, each file first details the first panel - 'galaxies', moving through each redshift bin (bin 0 is 0<z<0.25, bin 1 
+is 0.25<z<0.5, bin 2 us 0.5<z<1.0, bin 3 is 1<z<1.5, bin 4 is 1.5<z<2), then the early-type panel, late-type, and starbursts.  Note that there is no 
+redshift bin 4 data for the early- or late-types (1.5<z<2).
+
+Format - here is an example (the first z bin for the galaxy 3.6 micron LF):
+*********** band      3.6000
+########## redshift bin      0.00000
+lums   4.49040e+08  6.79651e+08  1.02869e+09  1.55698e+09  2.35659e+09  3.56685e+09  5.39865e+09  8.17120e+09  1.23676e+10
+lf      0.024458668     0.019111902     0.015340174     0.010203268    0.0051739856    0.0039276562    0.0016285470   0.00057478131   0.00014369506
+lf up     0.0013125454    0.0016211337    0.0014680345    0.0013176198   0.00051798262   0.00069034521   0.00055621992   0.00017897267   0.00011435746
+lf down    0.0013513668    0.0017093592    0.0011226824    0.0013972504   0.00082345776   0.00038737778   0.00047359659   0.00022816409   
+0.00010118526
+
+Explanation:
+First line - band (3.6 micron)
+Second line - redshift bin
+Third line - the luminosity (x axis) values
+4th line - LF (y axis) values
+5th line - LF up.  ADD to LF value to get the upper value
+6th line - LF done.  SUBTRACT from LF value to get the lower error bar.  If value is same as on 4th line then subtraction =0 i.e its an upper limit.
+
+Shout if anything doesn't make sense/seems to be incorrect (plotting should give you the same as Fig 8 unless I'v made an error preparing these 
+files!).
+
+Cheers,
+Tom
+
+PS since someone else asked me about H, h H0 etc here's a brief recap of what I used in the paper -
+I used H0=72 (lambda=0.7) in calculations. In the plotting (since h is more traditional and to aid comparisons), I used the traditional h (ie. based 
+on H0=100) so needed to shift my data by 0.72^2 and 1/0.72^3 for x and y.  I did similar corrections for other data (eg Shupe et al was 0.75, 
+Perez-Gonzalez was 0.7 etc) so could all be compared on same plots.
+By the way, the published Fig 12 comparing the 24 micron galaxy LF to other work had a plotting error that shifted the Shupe LF to the right.  The 
+correct version is annoyingly in much better agreement (attached).  Just in case you try recreating some of the plots and find you can't!

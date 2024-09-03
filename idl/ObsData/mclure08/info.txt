@@ -1,0 +1,4 @@
+Mc Lure O8. UV LF of LBG ;      z~5 (4.7 < z < 5.3)  and z~6 (5.7 < z < 6.3)
+survey: UDS, SXDS ;   0,63 deg^2,   1621 objects
+
+filter: 1500  A (=center of z' band at z=5)
